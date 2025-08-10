@@ -1,0 +1,631 @@
+# Grafana Configuration for ZarishHealthcare System
+# Comprehensive visualization and dashboards for humanitarian healthcare monitoring
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-config
+  namespace: zarish-monitoring
+  labels:
+    app: grafana
+    component: config
+data:
+  grafana.ini: |
+    [analytics]
+    check_for_updates = true
+    reporting_enabled = false
+
+    [security]
+    admin_user = admin
+    admin_password = zarish-healthcare-admin-change-in-production
+    allow_embedding = false
+    cookie_secure = true
+    cookie_samesite = strict
+    content_type_protection = true
+    strict_transport_security = true
+
+    [users]
+    allow_sign_up = false
+    allow_org_create = false
+    auto_assign_org = true
+    auto_assign_org_role = Viewer
+    default_theme = dark
+
+    [auth]
+    disable_login_form = false
+    disable_signout_menu = false
+
+    [auth.anonymous]
+    enabled = false
+
+    [auth.basic]
+    enabled = true
+
+    [auth.ldap]
+    enabled = false
+
+    [server]
+    protocol = http
+    http_addr = 0.0.0.0
+    http_port = 3000
+    domain = grafana.zarish.humanitarian.health
+    root_url = https://grafana.zarish.humanitarian.health/
+    serve_from_sub_path = false
+    enable_gzip = true
+
+    [database]
+    type = postgres
+    host = postgresql-primary.zarish-healthcare.svc.cluster.local:5432
+    name = grafana
+    user = grafana_user
+    password = grafana_password_change_in_production
+    ssl_mode = require
+
+    [session]
+    provider = redis
+    provider_config = addr=redis.zarish-healthcare.svc.cluster.local:6379,pool_size=100,db=grafana
+    cookie_name = grafana_sess
+    cookie_secure = true
+    session_life_time = 86400
+
+    [dataproxy]
+    timeout = 30
+    dial_timeout = 10
+    keep_alive_seconds = 30
+
+    [alerting]
+    enabled = true
+    execute_alerts = true
+    error_or_timeout = alerting
+    nodata_or_nullvalues = no_data
+    concurrent_render_limit = 5
+
+    [metrics]
+    enabled = true
+    interval_seconds = 10
+
+    [metrics.graphite]
+    address = 
+    prefix = prod.grafana.%(instance_name)s.
+
+    [log]
+    mode = console
+    level = info
+    filters = rendering:debug
+
+    [log.console]
+    level = info
+    format = console
+
+    [tracing.jaeger]
+    address = jaeger-collector.zarish-monitoring.svc.cluster.local:14268
+    always_included_tag = tag1:value1
+    sampler_type = const
+    sampler_param = 1
+
+    [external_image_storage]
+    provider = s3
+    bucket_url = https://zarish-healthcare-grafana.s3.amazonaws.com
+    access_key = ${AWS_ACCESS_KEY_ID}
+    secret_key = ${AWS_SECRET_ACCESS_KEY}
+
+    [smtp]
+    enabled = true
+    host = smtp.zarish.org:587
+    user = grafana@zarish.org
+    password = smtp_password_change_in_production
+    cert_file = 
+    key_file = 
+    skip_verify = false
+    from_address = grafana@zarish.org
+    from_name = ZarishHealthcare Monitoring
+    ehlo_identity = 
+    startTLS_policy = MandatoryStartTLS
+
+    [emails]
+    welcome_email_on_sign_up = false
+    templates_pattern = emails/*.html
+
+  datasources.yaml: |
+    apiVersion: 1
+    
+    datasources:
+      # Prometheus - Primary metrics source
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus.zarish-monitoring.svc.cluster.local:9090
+        isDefault: true
+        basicAuth: false
+        editable: true
+        jsonData:
+          httpMethod: POST
+          queryTimeout: 60s
+          timeInterval: 15s
+          prometheusType: Prometheus
+          prometheusVersion: 2.45.0
+          cacheLevel: High
+          exemplarTraceIdDestinations:
+            - name: trace_id
+              datasourceUid: jaeger_uid
+              url: http://jaeger-query.zarish-monitoring.svc.cluster.local:16686/trace/${__value.raw}
+        uid: prometheus_uid
+
+      # Jaeger - Distributed tracing
+      - name: Jaeger
+        type: jaeger
+        access: proxy
+        url: http://jaeger-query.zarish-monitoring.svc.cluster.local:16686
+        basicAuth: false
+        isDefault: false
+        editable: true
+        jsonData:
+          tracesToLogs:
+            datasourceUid: loki_uid
+            tags: ['job', 'instance', 'pod', 'namespace']
+            mappedTags: [
+              { key: 'service.name', value: 'service' },
+              { key: 'service.namespace', value: 'namespace' }
+            ]
+            mapTagNamesEnabled: true
+            spanStartTimeShift: '1h'
+            spanEndTimeShift: '1h'
+            filterByTraceID: true
+            filterBySpanID: true
+        uid: jaeger_uid
+
+      # Loki - Log aggregation
+      - name: Loki
+        type: loki
+        access: proxy
+        url: http://loki.zarish-monitoring.svc.cluster.local:3100
+        basicAuth: false
+        isDefault: false
+        editable: true
+        jsonData:
+          maxLines: 1000
+          derivedFields:
+            - name: TraceID
+              matcherRegex: "trace_id=(\\w+)"
+              url: "${__value.raw}"
+              datasourceUid: jaeger_uid
+        uid: loki_uid
+
+      # PostgreSQL - Application database metrics
+      - name: PostgreSQL
+        type: postgres
+        access: proxy
+        url: postgresql-primary.zarish-healthcare.svc.cluster.local:5432
+        database: zarish_healthcare
+        user: monitoring_user
+        basicAuth: false
+        isDefault: false
+        editable: false
+        secureJsonData:
+          password: monitoring_password_change_in_production
+        jsonData:
+          sslmode: require
+          postgresVersion: 1400
+          timescaledb: false
+        uid: postgresql_uid
+
+      # InfluxDB - Time series for custom metrics
+      - name: InfluxDB
+        type: influxdb
+        access: proxy
+        url: http://influxdb.zarish-monitoring.svc.cluster.local:8086
+        database: zarish_healthcare
+        user: monitoring_user
+        basicAuth: false
+        isDefault: false
+        editable: false
+        secureJsonData:
+          password: influx_password_change_in_production
+        jsonData:
+          httpMode: GET
+          timeInterval: 15s
+        uid: influxdb_uid
+
+      # Elasticsearch - Log search and analytics
+      - name: Elasticsearch
+        type: elasticsearch
+        access: proxy
+        url: http://elasticsearch.zarish-monitoring.svc.cluster.local:9200
+        database: "[zarish-healthcare-]YYYY.MM.DD"
+        basicAuth: false
+        isDefault: false
+        editable: false
+        jsonData:
+          esVersion: 8
+          timeField: "@timestamp"
+          interval: Daily
+          maxConcurrentShardRequests: 256
+          logMessageField: message
+          logLevelField: level
+        uid: elasticsearch_uid
+
+  dashboards.yaml: |
+    apiVersion: 1
+    
+    providers:
+      # ZarishHealthcare System Dashboards
+      - name: 'zarish-healthcare'
+        orgId: 1
+        folder: 'ZarishHealthcare System'
+        type: file
+        disableDeletion: false
+        editable: true
+        updateIntervalSeconds: 10
+        allowUiUpdates: true
+        options:
+          path: /var/lib/grafana/dashboards/zarish-healthcare
+
+      # Infrastructure Dashboards
+      - name: 'infrastructure'
+        orgId: 1
+        folder: 'Infrastructure'
+        type: file
+        disableDeletion: false
+        editable: true
+        updateIntervalSeconds: 10
+        allowUiUpdates: true
+        options:
+          path: /var/lib/grafana/dashboards/infrastructure
+
+      # Security Dashboards
+      - name: 'security'
+        orgId: 1
+        folder: 'Security & Compliance'
+        type: file
+        disableDeletion: false
+        editable: true
+        updateIntervalSeconds: 10
+        allowUiUpdates: true
+        options:
+          path: /var/lib/grafana/dashboards/security
+
+      # Business Intelligence Dashboards
+      - name: 'business'
+        orgId: 1
+        folder: 'Healthcare Analytics'
+        type: file
+        disableDeletion: false
+        editable: true
+        updateIntervalSeconds: 10
+        allowUiUpdates: true
+        options:
+          path: /var/lib/grafana/dashboards/business
+
+  notifiers.yaml: |
+    notifiers:
+      # Slack notifications for critical alerts
+      - name: slack-critical
+        type: slack
+        uid: slack_critical_uid
+        org_id: 1
+        is_default: true
+        send_reminder: true
+        disable_resolve_message: false
+        frequency: "5m"
+        settings:
+          url: https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK
+          channel: "#zarish-healthcare-alerts"
+          username: "ZarishHealthcare Monitoring"
+          iconEmoji: ":warning:"
+          iconUrl: ""
+          title: "ZarishHealthcare Alert"
+          text: |
+            {{ range .Alerts }}
+            *Alert:* {{ .Annotations.summary }}
+            *Description:* {{ .Annotations.description }}
+            *Severity:* {{ .Labels.severity }}
+            *Service:* {{ .Labels.service }}
+            *Environment:* {{ .Labels.environment }}
+            {{ end }}
+
+      # Email notifications for all alerts
+      - name: email-all
+        type: email
+        uid: email_all_uid
+        org_id: 1
+        is_default: false
+        send_reminder: true
+        disable_resolve_message: false
+        frequency: "10m"
+        settings:
+          addresses: "healthcare-ops@zarish.org;platform-team@zarish.org"
+          subject: "ZarishHealthcare Alert: {{ .GroupLabels.alertname }}"
+          body: |
+            <h2>ZarishHealthcare System Alert</h2>
+            {{ range .Alerts }}
+            <h3>{{ .Annotations.summary }}</h3>
+            <p><strong>Description:</strong> {{ .Annotations.description }}</p>
+            <p><strong>Severity:</strong> {{ .Labels.severity }}</p>
+            <p><strong>Service:</strong> {{ .Labels.service }}</p>
+            <p><strong>Instance:</strong> {{ .Labels.instance }}</p>
+            <p><strong>Started:</strong> {{ .StartsAt }}</p>
+            {{ end }}
+
+      # PagerDuty for critical production issues
+      - name: pagerduty-critical
+        type: pagerduty
+        uid: pagerduty_critical_uid
+        org_id: 1
+        is_default: false
+        send_reminder: true
+        disable_resolve_message: false
+        frequency: "1m"
+        settings:
+          integrationKey: "YOUR_PAGERDUTY_INTEGRATION_KEY"
+          severity: "critical"
+          customDetails: |
+            {
+              "service": "{{ .GroupLabels.service }}",
+              "environment": "{{ .GroupLabels.environment }}",
+              "cluster": "{{ .GroupLabels.cluster }}",
+              "namespace": "{{ .GroupLabels.namespace }}"
+            }
+
+      # Microsoft Teams for team notifications
+      - name: teams-healthcare
+        type: teams
+        uid: teams_healthcare_uid
+        org_id: 1
+        is_default: false
+        send_reminder: true
+        disable_resolve_message: false
+        frequency: "5m"
+        settings:
+          url: "YOUR_TEAMS_WEBHOOK_URL"
+          title: "ZarishHealthcare System Alert"
+          text: |
+            **Alert Summary:** {{ .GroupLabels.alertname }}
+            
+            {{ range .Alerts }}
+            **Service:** {{ .Labels.service }}
+            **Severity:** {{ .Labels.severity }}
+            **Description:** {{ .Annotations.description }}
+            **Started:** {{ .StartsAt }}
+            {{ end }}
+
+---
+# Grafana Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: zarish-monitoring
+  labels:
+    app: grafana
+    component: server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+      component: server
+  template:
+    metadata:
+      labels:
+        app: grafana
+        component: server
+    spec:
+      serviceAccountName: grafana
+      securityContext:
+        fsGroup: 472
+        runAsUser: 472
+        runAsGroup: 472
+        runAsNonRoot: true
+      containers:
+        - name: grafana
+          image: grafana/grafana:10.1.0
+          ports:
+            - containerPort: 3000
+              name: http
+              protocol: TCP
+          env:
+            - name: GF_SECURITY_ADMIN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-secret
+                  key: admin-user
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-secret
+                  key: admin-password
+            - name: GF_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-secret
+                  key: database-password
+            - name: GF_SESSION_PROVIDER_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-secret
+                  key: redis-config
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-secret
+                  key: aws-access-key
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-secret
+                  key: aws-secret-key
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+          volumeMounts:
+            - name: config
+              mountPath: /etc/grafana/
+            - name: storage
+              mountPath: /var/lib/grafana
+            - name: dashboards-zarish-healthcare
+              mountPath: /var/lib/grafana/dashboards/zarish-healthcare
+            - name: dashboards-infrastructure
+              mountPath: /var/lib/grafana/dashboards/infrastructure
+            - name: dashboards-security
+              mountPath: /var/lib/grafana/dashboards/security
+            - name: dashboards-business
+              mountPath: /var/lib/grafana/dashboards/business
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 30
+            timeoutSeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            timeoutSeconds: 10
+            periodSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+      volumes:
+        - name: config
+          configMap:
+            name: grafana-config
+        - name: storage
+          persistentVolumeClaim:
+            claimName: grafana-storage
+        - name: dashboards-zarish-healthcare
+          configMap:
+            name: grafana-dashboards-zarish-healthcare
+        - name: dashboards-infrastructure
+          configMap:
+            name: grafana-dashboards-infrastructure
+        - name: dashboards-security
+          configMap:
+            name: grafana-dashboards-security
+        - name: dashboards-business
+          configMap:
+            name: grafana-dashboards-business
+
+---
+# Grafana Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: zarish-monitoring
+  labels:
+    app: grafana
+    component: server
+  annotations:
+    prometheus.io/scrape: 'true'
+    prometheus.io/port: '3000'
+    prometheus.io/path: '/metrics'
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP
+      name: http
+  selector:
+    app: grafana
+    component: server
+
+---
+# Grafana Storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-storage
+  namespace: zarish-monitoring
+  labels:
+    app: grafana
+    component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: fast-ssd
+
+---
+# Grafana Secrets
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-secret
+  namespace: zarish-monitoring
+  labels:
+    app: grafana
+    component: secret
+type: Opaque
+stringData:
+  admin-user: admin
+  admin-password: zarish-healthcare-admin-change-in-production
+  database-password: grafana_password_change_in_production
+  redis-config: addr=redis.zarish-healthcare.svc.cluster.local:6379,pool_size=100,db=grafana
+  aws-access-key: YOUR_AWS_ACCESS_KEY
+  aws-secret-key: YOUR_AWS_SECRET_KEY
+
+---
+# Grafana ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: grafana
+  namespace: zarish-monitoring
+  labels:
+    app: grafana
+
+---
+# Grafana ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: grafana
+  labels:
+    app: grafana
+rules:
+  - apiGroups: [""]
+    resources:
+      - nodes
+      - nodes/proxy
+      - nodes/metrics
+      - services
+      - endpoints
+      - pods
+      - configmaps
+      - secrets
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["extensions"]
+    resources:
+      - ingresses
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources:
+      - ingresses
+    verbs: ["get", "list", "watch"]
+
+---
+# Grafana ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: grafana
+  labels:
+    app: grafana
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: grafana
+subjects:
+  - kind: ServiceAccount
+    name: grafana
+    namespace: zarish-monitoring

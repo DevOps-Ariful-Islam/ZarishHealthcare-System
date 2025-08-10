@@ -1,0 +1,65 @@
+{
+  "name": "zarishhealthcare-system",
+  "version": "1.0.0",
+  "description": "Comprehensive Healthcare Information Platform for Humanitarian Operations",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zarishsphere/zarishhealthcare-system"
+  },
+  "keywords": [
+    "healthcare",
+    "humanitarian",
+    "microservices",
+    "offline-first",
+    "zarish"
+  ],
+  "author": "ZarishSphere",
+  "license": "PROPRIETARY",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "services/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:services\" \"npm run dev:portal\" \"npm run dev:mobile\"",
+    "dev:services": "./scripts/start-services.sh",
+    "dev:portal": "cd apps/zarish-portal && npm run dev",
+    "dev:mobile": "cd apps/zarish-mobile && npm run start",
+    "build": "npm run build:services && npm run build:portal",
+    "build:services": "./scripts/build-services.sh",
+    "build:portal": "cd apps/zarish-portal && npm run build",
+    "test": "jest",
+    "test:services": "./scripts/test-services.sh",
+    "test:e2e": "cypress run",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "k8s:deploy": "kubectl apply -f infrastructure/kubernetes/",
+    "k8s:delete": "kubectl delete -f infrastructure/kubernetes/",
+    "lint": "eslint . --ext .ts,.tsx,.js,.jsx",
+    "format": "prettier --write .",
+    "clean": "rm -rf node_modules apps/*/node_modules services/*/node_modules packages/*/node_modules",
+    "setup": "./scripts/setup.sh",
+    "migrate": "./scripts/migrate.sh",
+    "seed": "./scripts/seed.sh"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "concurrently": "^8.2.2",
+    "cypress": "^13.6.6",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react": "^7.33.2",
+    "jest": "^29.7.0",
+    "prettier": "^3.2.5",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

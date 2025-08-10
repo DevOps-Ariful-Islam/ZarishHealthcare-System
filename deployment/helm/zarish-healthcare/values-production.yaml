@@ -1,0 +1,665 @@
+# ZarishHealthcare System Production Values
+# Production-ready configuration for humanitarian healthcare services
+
+# Global production configuration
+global:
+  imageRegistry: "ghcr.io"
+  imagePrefix: "zarish-healthcare"
+  environment: "production"
+  region: "multi-region"
+  
+  # Production security settings
+  security:
+    tls:
+      enabled: true
+      certManager: true
+    rbac:
+      enabled: true
+    networkPolicies:
+      enabled: true
+    podSecurityPolicy:
+      enabled: true
+  
+  # Emergency response - production ready
+  emergencyMode:
+    enabled: true
+    alertingThreshold: "critical"
+    backupInterval: "5m"
+    syncPriority: "emergency"
+
+# Production service configurations
+zarishCare:
+  replicaCount: 5
+  image:
+    tag: "stable"
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+    limits:
+      cpu: 4000m
+      memory: 8Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 5
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage: 70
+  env:
+    NODE_ENV: "production"
+    LOG_LEVEL: "warn"
+    HIPAA_COMPLIANCE: "strict"
+    GDPR_COMPLIANCE: "strict"
+    MAX_CONCURRENT_PATIENTS: "10000"
+    CLINICAL_DECISION_SUPPORT: "enabled"
+
+zarishLabs:
+  replicaCount: 3
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 12
+  env:
+    LAB_INTEGRATION_MODE: "enterprise"
+    QUALITY_CONTROL: "comprehensive"
+    CRITICAL_VALUE_ALERTS: "immediate"
+    LAB_AUTOMATION: "enabled"
+
+zarishOps:
+  replicaCount: 3
+  resources:
+    requests:
+      cpu: 300m
+      memory: 1Gi
+    limits:
+      cpu: 1500m
+      memory: 3Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 15
+  env:
+    COORDINATION_MODE: "global"
+    EMERGENCY_PROTOCOLS: "comprehensive"
+    PARTNER_INTEGRATION: "real-time"
+    RESOURCE_OPTIMIZATION: "ai-powered"
+
+zarishAnalytics:
+  replicaCount: 3
+  resources:
+    requests:
+      cpu: 2000m
+      memory: 4Gi
+    limits:
+      cpu: 8000m
+      memory: 16Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 50
+  env:
+    ANALYTICS_MODE: "real-time"
+    AI_ENABLED: "true"
+    POPULATION_HEALTH: "comprehensive"
+    PREDICTIVE_MODELING: "enabled"
+    ML_INFERENCE: "gpu-accelerated"
+
+zarishAccess:
+  replicaCount: 5
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 5
+    maxReplicas: 15
+  env:
+    JWT_EXPIRATION: "4h"
+    MFA_REQUIRED: "true"
+    SESSION_TIMEOUT: "15m"
+    AUDIT_LOGGING: "comprehensive"
+    THREAT_DETECTION: "enabled"
+    COMPLIANCE_MODE: "strict"
+
+zarishSync:
+  replicaCount: 4
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+    limits:
+      cpu: 4000m
+      memory: 8Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 4
+    maxReplicas: 12
+  env:
+    SYNC_STRATEGY: "intelligent"
+    CONFLICT_RESOLUTION: "ai-assisted"
+    OFFLINE_RETENTION: "168h"  # 7 days
+    BANDWIDTH_OPTIMIZATION: "advanced"
+    EMERGENCY_SYNC: "prioritized"
+
+# Frontend production configuration
+clinicalDashboard:
+  replicaCount: 3
+  resources:
+    requests:
+      cpu: 300m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/rate-limit: "100"
+      nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    hosts:
+      - host: dashboard.zarish.humanitarian.health
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: dashboard-production-tls
+        hosts:
+          - dashboard.zarish.humanitarian.health
+
+mobileAppBackend:
+  replicaCount: 3
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+
+# Production database configuration
+postgresql:
+  enabled: true
+  auth:
+    enablePostgresUser: true
+    postgresPassword: "CHANGE_IN_PRODUCTION_VAULT"
+    username: "zarish_prod_user"
+    password: "CHANGE_IN_PRODUCTION_VAULT"
+    database: "zarish_healthcare_prod"
+  
+  architecture: replication
+  primary:
+    persistence:
+      enabled: true
+      size: 500Gi
+      storageClass: "premium-ssd"
+    resources:
+      requests:
+        cpu: 2000m
+        memory: 8Gi
+      limits:
+        cpu: 8000m
+        memory: 32Gi
+    configuration: |
+      max_connections = 1000
+      shared_buffers = 8GB
+      effective_cache_size = 24GB
+      maintenance_work_mem = 2GB
+      checkpoint_completion_target = 0.9
+      wal_buffers = 64MB
+      default_statistics_target = 100
+      random_page_cost = 1.1
+      effective_io_concurrency = 200
+      work_mem = 8MB
+      min_wal_size = 2GB
+      max_wal_size = 8GB
+      
+  readReplicas:
+    replicaCount: 3
+    persistence:
+      enabled: true
+      size: 500Gi
+      storageClass: "premium-ssd"
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 4Gi
+      limits:
+        cpu: 4000m
+        memory: 16Gi
+  
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+  
+  # Backup configuration
+  backup:
+    enabled: true
+    schedule: "0 2 * * *"
+    retention: "30d"
+    encryption: true
+
+# Production Redis configuration
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    password: "CHANGE_IN_PRODUCTION_VAULT"
+  
+  architecture: replication
+  master:
+    persistence:
+      enabled: true
+      size: 50Gi
+      storageClass: "premium-ssd"
+    resources:
+      requests:
+        cpu: 500m
+        memory: 2Gi
+      limits:
+        cpu: 2000m
+        memory: 8Gi
+    configuration: |
+      maxmemory 6gb
+      maxmemory-policy allkeys-lru
+      save 900 1
+      save 300 10
+      save 60 10000
+      
+  replica:
+    replicaCount: 3
+    persistence:
+      enabled: true
+      size: 50Gi
+      storageClass: "premium-ssd"
+    resources:
+      requests:
+        cpu: 300m
+        memory: 1Gi
+      limits:
+        cpu: 1000m
+        memory: 4Gi
+
+# Production CouchDB configuration
+couchdb:
+  enabled: true
+  clusterSize: 5
+  couchdbConfig:
+    couchdb:
+      uuid: "zarish-humanitarian-production-cluster"
+    chttpd:
+      port: 5984
+      bind_address: "0.0.0.0"
+      max_connections: 2048
+    httpd:
+      max_connections: 2048
+  
+  persistentVolume:
+    enabled: true
+    size: 200Gi
+    storageClass: "premium-ssd"
+  
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+    limits:
+      cpu: 4000m
+      memory: 8Gi
+
+# Production API Gateway (Kong)
+kong:
+  enabled: true
+  image:
+    tag: "3.3.1"
+  
+  replicaCount: 3
+  
+  admin:
+    enabled: true
+    type: ClusterIP
+    tls:
+      enabled: true
+      
+  proxy:
+    enabled: true
+    type: LoadBalancer
+    tls:
+      enabled: true
+  
+  env:
+    database: postgres
+    pg_host: zarish-healthcare-postgresql-primary
+    pg_database: kong_prod
+    pg_user: kong_prod
+    pg_password: "CHANGE_IN_PRODUCTION_VAULT"
+    nginx_worker_processes: "auto"
+    nginx_worker_connections: "4096"
+    
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+
+# Production monitoring stack
+monitoring:
+  enabled: true
+  
+  prometheus:
+    enabled: true
+    retention: "30d"
+    storageSize: "500Gi"
+    storageClass: "premium-ssd"
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 4Gi
+      limits:
+        cpu: 4000m
+        memory: 16Gi
+    replicas: 2
+    configuration:
+      global:
+        scrape_interval: 15s
+        evaluation_interval: 15s
+      alerting:
+        alertmanagers:
+          - static_configs:
+              - targets:
+                - alertmanager:9093
+  
+  grafana:
+    enabled: true
+    adminPassword: "CHANGE_IN_PRODUCTION_VAULT"
+    persistence:
+      enabled: true
+      size: "50Gi"
+      storageClass: "premium-ssd"
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+    replicas: 2
+    
+  alertmanager:
+    enabled: true
+    config:
+      global:
+        smtp_smarthost: 'smtp.zarish.org:587'
+        smtp_from: 'alerts@zarish.org'
+      route:
+        group_by: ['alertname', 'severity']
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+        receiver: 'humanitarian-ops'
+      receivers:
+        - name: 'humanitarian-ops'
+          email_configs:
+            - to: 'healthcare-ops@zarish.org'
+              subject: 'ZarishHealthcare Alert: {{ .GroupLabels.alertname }}'
+          slack_configs:
+            - api_url: 'SLACK_WEBHOOK_URL_FROM_VAULT'
+              channel: '#zarish-healthcare-alerts'
+              title: 'ZarishHealthcare Alert'
+              text: 'Emergency: {{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+        - name: 'emergency-response'
+          pagerduty_configs:
+            - service_key: 'PAGERDUTY_KEY_FROM_VAULT'
+              description: 'ZarishHealthcare Emergency: {{ .GroupLabels.alertname }}'
+
+  jaeger:
+    enabled: true
+    storage:
+      type: elasticsearch
+    collector:
+      replicas: 3
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+    query:
+      replicas: 2
+      resources:
+        requests:
+          cpu: 300m
+          memory: 512Mi
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+
+# Production logging stack
+logging:
+  enabled: true
+  
+  elasticsearch:
+    enabled: true
+    replicas: 5
+    minimumMasterNodes: 3
+    persistence:
+      enabled: true
+      size: "1Ti"
+      storageClass: "premium-ssd"
+    resources:
+      requests:
+        cpu: 2000m
+        memory: 8Gi
+      limits:
+        cpu: 8000m
+        memory: 32Gi
+    configuration: |
+      cluster.name: zarish-healthcare-logs-prod
+      node.master: true
+      node.data: true
+      node.ingest: true
+      network.host: 0.0.0.0
+      discovery.zen.minimum_master_nodes: 3
+      xpack.security.enabled: false
+      indices.memory.index_buffer_size: 40%
+      
+  fluentBit:
+    enabled: true
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+
+# Production security configuration
+security:
+  networkPolicies:
+    enabled: true
+    
+  podSecurityPolicy:
+    enabled: true
+    
+  serviceAccount:
+    create: true
+    name: "zarish-healthcare-prod-sa"
+    
+  rbac:
+    create: true
+    
+  certificates:
+    enabled: true
+    issuer: "letsencrypt-prod"
+    
+  vault:
+    enabled: true
+    address: "https://vault.zarish.org"
+    path: "zarish-healthcare/prod"
+    auth:
+      method: "kubernetes"
+      role: "zarish-healthcare-prod"
+
+# Production backup configuration
+backup:
+  enabled: true
+  schedule: "0 1 * * *"  # Daily at 1 AM
+  retention: "90d"
+  encryption:
+    enabled: true
+    vault:
+      path: "zarish-healthcare/backup-keys"
+  
+  destinations:
+    - type: s3
+      bucket: "zarish-healthcare-prod-backups"
+      region: "us-east-1"
+      encryption: "AES256"
+    - type: azure
+      container: "zarish-prod-backups"
+      account: "zarishprodstorage"
+    - type: gcs
+      bucket: "zarish-healthcare-prod-backup"
+      project: "zarish-humanitarian-health"
+
+# Production emergency response configuration
+emergencyResponse:
+  enabled: true
+  
+  alerts:
+    webhook: "EMERGENCY_WEBHOOK_FROM_VAULT"
+    email:
+      - "emergency@zarish.org"
+      - "healthcare-director@zarish.org"
+      - "ops-manager@zarish.org"
+    sms:
+      - "+1234567890"  # Emergency contact
+      - "+0987654321"  # Backup contact
+  
+  scaling:
+    autoScale: true
+    emergencyReplicas: 10
+    maxEmergencyReplicas: 50
+    
+  monitoring:
+    enhancedMetrics: true
+    criticalAlerts: true
+    realTimeNotifications: true
+
+# Production compliance configuration
+compliance:
+  hipaa:
+    enabled: true
+    auditLogging: comprehensive
+    encryption: "required-in-transit-and-at-rest"
+    accessControls: strict
+    dataRetention: "2555d"  # 7 years
+    businessAssociateAgreements: required
+    
+  gdpr:
+    enabled: true
+    dataSubjectRights: comprehensive
+    consentManagement: required
+    dataPortability: enabled
+    rightToErasure: enabled
+    dataProtectionOfficer: "dpo@zarish.org"
+    
+  whoStandards:
+    enabled: true
+    dataQuality: enforced
+    interoperability: hl7-fhir-r4
+    reportingStandards: who-dhis2
+    healthMetrics: comprehensive
+
+# Production resource quotas
+resourceQuotas:
+  enabled: true
+  requests:
+    cpu: "50"
+    memory: "200Gi"
+  limits:
+    cpu: "200"
+    memory: "500Gi"
+  persistentVolumeClaims: "50"
+  services: "50"
+  secrets: "200"
+  configMaps: "200"
+
+# Production node affinity
+nodeAffinity:
+  enabled: true
+  nodeSelector:
+    node-type: "production"
+    zone: "humanitarian-healthcare"
+
+# Production pod disruption budgets
+podDisruptionBudgets:
+  enabled: true
+  minAvailable: 2  # Always keep at least 2 replicas running
+
+# Production ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rate-limit: "1000"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/client-max-body-size: "50m"
+  hosts:
+    - host: api.zarish.humanitarian.health
+      paths:
+        - path: /api/v1
+          pathType: Prefix
+          backend:
+            service:
+              name: kong-proxy
+              port:
+                number: 80
+  tls:
+    - secretName: zarish-api-production-tls
+      hosts:
+        - api.zarish.humanitarian.health
+
+# Production autoscaling configuration
+horizontalPodAutoscaler:
+  enabled: true
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+        - type: Pods
+          value: 2
+          periodSeconds: 60

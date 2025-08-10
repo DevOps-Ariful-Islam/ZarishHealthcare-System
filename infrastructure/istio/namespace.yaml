@@ -1,0 +1,42 @@
+# Kubernetes Namespace Configuration for ZarishHealthcare System
+# Enables Istio service mesh for humanitarian healthcare microservices
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: zarish-healthcare
+  labels:
+    istio-injection: enabled
+    environment: production
+    purpose: humanitarian-healthcare
+    organization: zarish-sphere
+  annotations:
+    description: "ZarishHealthcare System - Humanitarian Healthcare Microservices Platform"
+    contact: "healthcare@zarish.org"
+    compliance: "HIPAA,GDPR,WHO-Health-Data-Standards"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: zarish-monitoring
+  labels:
+    istio-injection: enabled
+    environment: production
+    purpose: observability
+    organization: zarish-sphere
+  annotations:
+    description: "ZarishHealthcare Monitoring and Observability Stack"
+    contact: "ops@zarish.org"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: zarish-gateway
+  labels:
+    istio-injection: enabled
+    environment: production
+    purpose: api-gateway
+    organization: zarish-sphere
+  annotations:
+    description: "ZarishHealthcare API Gateway and Ingress Management"
+    contact: "platform@zarish.org"

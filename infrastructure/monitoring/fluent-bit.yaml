@@ -1,0 +1,547 @@
+# Fluent Bit Configuration for ZarishHealthcare System  
+# Log collection and shipping for humanitarian healthcare services
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-config
+  namespace: zarish-monitoring
+  labels:
+    app: fluent-bit
+    component: config
+data:
+  fluent-bit.conf: |
+    [SERVICE]
+        Flush         5
+        Log_Level     info
+        Daemon        off
+        Parsers_File  parsers.conf
+        HTTP_Server   On
+        HTTP_Listen   0.0.0.0
+        HTTP_Port     2020
+        Health_Check  On
+        storage.path              /var/log/flb-storage/
+        storage.sync              normal
+        storage.checksum          off
+        storage.backlog.mem_limit 50M
+
+    [INPUT]
+        Name              tail
+        Tag               kube.*
+        Path              /var/log/containers/*.log
+        Parser            cri
+        DB                /var/log/flb_kube.db
+        Mem_Buf_Limit     50MB
+        Skip_Long_Lines   On
+        Refresh_Interval  10
+        Rotate_Wait       30
+        storage.type      filesystem
+        Read_from_Head    true
+
+    [INPUT]
+        Name            systemd
+        Tag             host.*
+        Systemd_Filter  _SYSTEMD_UNIT=kubelet.service
+        Systemd_Filter  _SYSTEMD_UNIT=docker.service
+        Systemd_Filter  _SYSTEMD_UNIT=containerd.service
+        Read_From_Tail  On
+
+    [FILTER]
+        Name                kubernetes
+        Match               kube.*
+        Kube_URL            https://kubernetes.default.svc:443
+        Kube_CA_File        /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+        Kube_Token_File     /var/run/secrets/kubernetes.io/serviceaccount/token
+        Kube_Tag_Prefix     kube.var.log.containers.
+        Merge_Log           On
+        Merge_Log_Key       log_processed
+        K8S-Logging.Parser  On
+        K8S-Logging.Exclude Off
+        Annotations         Off
+        Labels              On
+
+    [FILTER]
+        Name    modify
+        Match   kube.*
+        Add     cluster_name zarish-healthcare-production
+        Add     environment production
+        Add     system zarish-healthcare
+
+    # Healthcare-specific log processing
+    [FILTER]
+        Name    grep
+        Match   kube.*
+        Regex   kubernetes.namespace_name ^zarish-
+
+    [FILTER]
+        Name    parser
+        Match   kube.*zarish-care*
+        Key_Name log
+        Parser   zarish_care_parser
+        Reserve_Data On
+
+    [FILTER]
+        Name    parser
+        Match   kube.*zarish-labs*
+        Key_Name log
+        Parser   zarish_labs_parser
+        Reserve_Data On
+
+    [FILTER]
+        Name    parser
+        Match   kube.*zarish-access*
+        Key_Name log
+        Parser   zarish_access_parser
+        Reserve_Data On
+
+    [FILTER]
+        Name    parser
+        Match   kube.*zarish-sync*
+        Key_Name log
+        Parser   zarish_sync_parser
+        Reserve_Data On
+
+    # Security log enhancement
+    [FILTER]
+        Name    modify
+        Match   kube.*zarish-access*
+        Add     security_event true
+        Add     compliance_tags hipaa,gdpr
+        Add     data_classification sensitive
+
+    # Audit log enhancement
+    [FILTER]
+        Name    grep
+        Match   kube.*
+        Regex   log (audit|login|authentication|authorization|patient_access|data_export)
+        
+    [FILTER]
+        Name    modify
+        Match   kube.*
+        Add     audit_event true
+
+    # Emergency mode detection
+    [FILTER]
+        Name    grep
+        Match   kube.*
+        Regex   log emergency.mode
+        
+    [FILTER]
+        Name    modify
+        Match   kube.*
+        Add     emergency_mode true
+        Add     priority critical
+
+    # PII detection and masking
+    [FILTER]
+        Name    modify
+        Match   kube.*
+        Add     phi_scrubbed false
+
+    [FILTER]
+        Name    rewrite_tag
+        Match   kube.*
+        Rule    log .*(patient_id|medical_record|ssn|phone|email).* phi_detected true
+
+    [FILTER] 
+        Name    modify
+        Match   phi_detected
+        Add     data_classification phi
+        Add     compliance_tags hipaa,gdpr,phi
+        Add     phi_scrubbed true
+
+    # Geographic tagging
+    [FILTER]
+        Name    modify
+        Match   kube.*zarish-*
+        Add     location.country multi-country
+        Add     location.region humanitarian-operations
+
+    # Trace correlation
+    [FILTER]
+        Name    parser
+        Match   kube.*
+        Key_Name log  
+        Parser   trace_parser
+        Reserve_Data On
+
+    # Error log enhancement
+    [FILTER]
+        Name    grep
+        Match   kube.*
+        Regex   log (ERROR|FATAL|exception|stack.trace)
+
+    [FILTER]
+        Name    modify
+        Match   kube.*
+        Add     error_event true
+        Add     severity error
+
+    # Output to Elasticsearch - Healthcare Logs
+    [OUTPUT]
+        Name            es
+        Match           kube.*zarish-*
+        Host            elasticsearch.zarish-monitoring.svc.cluster.local
+        Port            9200
+        Index           zarish-healthcare
+        Type            _doc
+        Time_Key        @timestamp
+        Time_Key_Format %Y-%m-%dT%H:%M:%S.%L%z
+        Time_Key_Nanos  Off
+        Include_Tag_Key Off
+        Tag_Key         tag
+        Logstash_Format On
+        Logstash_Prefix zarish-healthcare
+        Logstash_DateFormat %Y.%m.%d
+        Retry_Limit     10
+        Storage.total_limit_size 10G
+        Buffer_Size     50MB
+        Workers         4
+
+    # Output to Elasticsearch - Security Logs  
+    [OUTPUT]
+        Name            es
+        Match           *security_event*
+        Host            elasticsearch.zarish-monitoring.svc.cluster.local
+        Port            9200
+        Index           zarish-security
+        Type            _doc
+        Time_Key        @timestamp
+        Time_Key_Format %Y-%m-%dT%H:%M:%S.%L%z
+        Include_Tag_Key Off
+        Logstash_Format On
+        Logstash_Prefix zarish-security
+        Logstash_DateFormat %Y.%m.%d
+        Retry_Limit     15
+        Storage.total_limit_size 5G
+
+    # Output to Elasticsearch - Audit Logs
+    [OUTPUT]
+        Name            es
+        Match           *audit_event*
+        Host            elasticsearch.zarish-monitoring.svc.cluster.local
+        Port            9200
+        Index           zarish-audit
+        Type            _doc
+        Time_Key        @timestamp
+        Time_Key_Format %Y-%m-%dT%H:%M:%S.%L%z
+        Include_Tag_Key Off
+        Logstash_Format On
+        Logstash_Prefix zarish-audit
+        Logstash_DateFormat %Y.%m.%d
+        Retry_Limit     20
+        Storage.total_limit_size 5G
+
+    # Output to Elasticsearch - Emergency Logs
+    [OUTPUT]
+        Name            es
+        Match           *emergency_mode*
+        Host            elasticsearch.zarish-monitoring.svc.cluster.local
+        Port            9200
+        Index           zarish-emergency
+        Type            _doc
+        Time_Key        @timestamp
+        Time_Key_Format %Y-%m-%dT%H:%M:%S.%L%z
+        Include_Tag_Key Off
+        Logstash_Format On
+        Logstash_Prefix zarish-emergency
+        Logstash_DateFormat %Y.%m.%d
+        Retry_Limit     25
+        Storage.total_limit_size 2G
+
+  parsers.conf: |
+    [PARSER]
+        Name        cri
+        Format      regex
+        Regex       ^(?<time>[^ ]+) (?<stream>stdout|stderr) (?<logtag>[^ ]*) (?<log>.*)$
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L%z
+
+    [PARSER]
+        Name        zarish_care_parser
+        Format      regex
+        Regex       ^\[(?<timestamp>[^\]]+)\] (?<level>\w+) \[(?<component>[^\]]+)\] (?<message>.*?)(?:\s+patient_id=(?<patient_id>\w+))?(?:\s+user_id=(?<user_id>\w+))?(?:\s+facility_id=(?<facility_id>\w+))?(?:\s+request_id=(?<request_id>[^\s]+))?(?:\s+trace_id=(?<trace_id>[^\s]+))?
+        Time_Key    timestamp
+        Time_Format %Y-%m-%d %H:%M:%S.%L
+
+    [PARSER]
+        Name        zarish_labs_parser
+        Format      regex
+        Regex       ^\[(?<timestamp>[^\]]+)\] (?<level>\w+) \[(?<component>[^\]]+)\] (?<message>.*?)(?:\s+order_id=(?<order_id>\w+))?(?:\s+result_id=(?<result_id>\w+))?(?:\s+test_type=(?<test_type>[^\s]+))?(?:\s+priority=(?<priority>\w+))?(?:\s+trace_id=(?<trace_id>[^\s]+))?
+        Time_Key    timestamp
+        Time_Format %Y-%m-%d %H:%M:%S.%L
+
+    [PARSER]
+        Name        zarish_access_parser
+        Format      regex
+        Regex       ^\[(?<timestamp>[^\]]+)\] (?<level>\w+) \[(?<component>[^\]]+)\] (?<message>.*?)(?:\s+user_id=(?<user_id>\w+))?(?:\s+session_id=(?<session_id>[^\s]+))?(?:\s+ip_addr=(?<ip_address>[^\s]+))?(?:\s+auth_method=(?<auth_method>\w+))?(?:\s+mfa=(?<mfa_used>\w+))?(?:\s+trace_id=(?<trace_id>[^\s]+))?
+        Time_Key    timestamp
+        Time_Format %Y-%m-%d %H:%M:%S.%L
+
+    [PARSER]
+        Name        zarish_sync_parser
+        Format      regex
+        Regex       ^\[(?<timestamp>[^\]]+)\] (?<level>\w+) \[(?<component>[^\]]+)\] (?<message>.*?)(?:\s+facility_id=(?<facility_id>\w+))?(?:\s+sync_id=(?<sync_id>[^\s]+))?(?:\s+conflict_count=(?<conflict_count>\d+))?(?:\s+records_synced=(?<records_synced>\d+))?(?:\s+trace_id=(?<trace_id>[^\s]+))?
+        Time_Key    timestamp
+        Time_Format %Y-%m-%d %H:%M:%S.%L
+
+    [PARSER]
+        Name        trace_parser
+        Format      regex
+        Regex       .*trace_id[=:](?<trace_id>[a-fA-F0-9]{16,32}).*span_id[=:](?<span_id>[a-fA-F0-9]{8,16})
+        Types       trace_id:string span_id:string
+
+    [PARSER]
+        Name        json_parser
+        Format      json
+        Time_Key    timestamp
+        Time_Format %Y-%m-%dT%H:%M:%S.%L%z
+
+    [PARSER]
+        Name        nginx_parser
+        Format      regex
+        Regex       ^(?<remote>[^ ]*) (?<host>[^ ]*) (?<user>[^ ]*) \[(?<time>[^\]]*)\] "(?<method>\S+)(?: +(?<path>[^\"]*?)(?: +\S*)?)?" (?<code>[^ ]*) (?<size>[^ ]*)(?: "(?<referer>[^\"]*)" "(?<agent>[^\"]*)")
+        Time_Key    time
+        Time_Format %d/%b/%Y:%H:%M:%S %z
+
+---
+# Fluent Bit DaemonSet
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluent-bit
+  namespace: zarish-monitoring
+  labels:
+    app: fluent-bit
+    component: log-collector
+spec:
+  selector:
+    matchLabels:
+      app: fluent-bit
+      component: log-collector
+  template:
+    metadata:
+      labels:
+        app: fluent-bit
+        component: log-collector
+    spec:
+      serviceAccountName: fluent-bit
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: fluent-bit
+          image: fluent/fluent-bit:2.1.8
+          ports:
+            - containerPort: 2020
+              name: http
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          env:
+            - name: FLUENT_CONF
+              value: fluent-bit.conf
+            - name: FLUENT_OPT
+              value: ""
+          volumeMounts:
+            - name: config
+              mountPath: /fluent-bit/etc/
+            - name: varlog
+              mountPath: /var/log
+            - name: varlibdockercontainers
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+            - name: runlogjournal
+              mountPath: /run/log/journal
+              readOnly: true
+            - name: dmesg
+              mountPath: /dev/kmsg
+              readOnly: true
+            - name: storage
+              mountPath: /var/log/flb-storage/
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 2020
+            initialDelaySeconds: 30
+            timeoutSeconds: 10
+            periodSeconds: 30
+            successThreshold: 1
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 2020
+            initialDelaySeconds: 10
+            timeoutSeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+      volumes:
+        - name: config
+          configMap:
+            name: fluent-bit-config
+        - name: varlog
+          hostPath:
+            path: /var/log
+        - name: varlibdockercontainers
+          hostPath:
+            path: /var/lib/docker/containers
+        - name: runlogjournal
+          hostPath:
+            path: /run/log/journal
+        - name: dmesg
+          hostPath:
+            path: /dev/kmsg
+        - name: storage
+          hostPath:
+            path: /var/log/fluent-bit-storage
+            type: DirectoryOrCreate
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - operator: Exists
+          effect: NoExecute
+        - operator: Exists
+          effect: NoSchedule
+
+---
+# Fluent Bit Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: fluent-bit
+  namespace: zarish-monitoring
+  labels:
+    app: fluent-bit
+    component: log-collector
+  annotations:
+    prometheus.io/scrape: 'true'
+    prometheus.io/port: '2020'
+    prometheus.io/path: '/api/v1/metrics/prometheus'
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - port: 2020
+      targetPort: 2020
+      protocol: TCP
+      name: http
+  selector:
+    app: fluent-bit
+    component: log-collector
+
+---
+# Fluent Bit ServiceAccount and RBAC
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fluent-bit
+  namespace: zarish-monitoring
+  labels:
+    app: fluent-bit
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: fluent-bit
+  labels:
+    app: fluent-bit
+rules:
+  - apiGroups: [""]
+    resources:
+      - namespaces
+      - pods
+      - nodes
+      - nodes/proxy
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: fluent-bit
+  labels:
+    app: fluent-bit
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: fluent-bit
+subjects:
+  - kind: ServiceAccount
+    name: fluent-bit
+    namespace: zarish-monitoring
+
+---
+# Log Retention Policy Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: log-retention-policy
+  namespace: zarish-monitoring
+  labels:
+    app: log-management
+    component: retention
+data:
+  retention-policy.json: |
+    {
+      "policies": [
+        {
+          "name": "zarish-healthcare-policy",
+          "indices": ["zarish-healthcare-*"],
+          "retention_days": 30,
+          "rollover_size": "10gb",
+          "rollover_age": "1d",
+          "priority": 100
+        },
+        {
+          "name": "zarish-security-policy", 
+          "indices": ["zarish-security-*"],
+          "retention_days": 90,
+          "rollover_size": "5gb",
+          "rollover_age": "1d",
+          "priority": 200
+        },
+        {
+          "name": "zarish-audit-policy",
+          "indices": ["zarish-audit-*"],
+          "retention_days": 2555,
+          "rollover_size": "5gb", 
+          "rollover_age": "1d",
+          "priority": 300
+        },
+        {
+          "name": "zarish-emergency-policy",
+          "indices": ["zarish-emergency-*"],
+          "retention_days": 365,
+          "rollover_size": "1gb",
+          "rollover_age": "6h",
+          "priority": 400
+        }
+      ],
+      "compliance_requirements": {
+        "hipaa": {
+          "minimum_retention_days": 2555,
+          "encryption_required": true,
+          "access_logging": true
+        },
+        "gdpr": {
+          "minimum_retention_days": 90,
+          "data_subject_access": true,
+          "right_to_erasure": true
+        },
+        "humanitarian_standards": {
+          "emergency_logs_retention": 365,
+          "patient_data_logs": 2555,
+          "operational_logs": 90
+        }
+      }
+    }

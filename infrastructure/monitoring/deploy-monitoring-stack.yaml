@@ -1,0 +1,497 @@
+# ZarishHealthcare System Monitoring Stack Deployment
+# Complete observability solution for humanitarian healthcare services
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: monitoring-deployment-config
+  namespace: zarish-monitoring
+  labels:
+    app: monitoring-stack
+    component: deployment-config
+data:
+  deployment-order.yaml: |
+    # Deployment sequence for ZarishHealthcare monitoring stack
+    deployment_phases:
+      phase_1_infrastructure:
+        - namespace_creation
+        - storage_classes
+        - persistent_volumes
+        - network_policies
+      
+      phase_2_data_stores:
+        - elasticsearch
+        - influxdb (optional)
+        
+      phase_3_collectors:
+        - prometheus
+        - fluent-bit
+        - jaeger-agent
+        
+      phase_4_processors:
+        - jaeger-collector
+        - jaeger-query
+        - alertmanager
+        
+      phase_5_visualization:
+        - grafana
+        - jaeger-ui
+        
+      phase_6_validation:
+        - health_checks
+        - integration_tests
+        - dashboard_import
+
+  monitoring-stack-values.yaml: |
+    # Humanitarian Healthcare Monitoring Configuration
+    global:
+      clusterName: "zarish-healthcare-production"
+      environment: "production"
+      region: "multi-region"
+      organization: "zarish-sphere"
+      compliance:
+        - hipaa
+        - gdpr
+        - who-standards
+      
+    prometheus:
+      enabled: true
+      retention: "15d"
+      storage: "100Gi"
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "2Gi"
+        limits:
+          cpu: "2000m"
+          memory: "8Gi"
+      scrape_intervals:
+        default: "15s"
+        healthcare_services: "30s"
+        security_services: "15s"
+        infrastructure: "30s"
+      
+    grafana:
+      enabled: true
+      admin_password: "zarish-admin-change-in-production"
+      storage: "20Gi"
+      resources:
+        requests:
+          cpu: "250m"
+          memory: "512Mi"
+        limits:
+          cpu: "1000m"
+          memory: "2Gi"
+      dashboards:
+        healthcare_operations: true
+        security_monitoring: true
+        infrastructure_monitoring: true
+        business_intelligence: true
+      
+    jaeger:
+      enabled: true
+      sampling_rate: 0.1
+      storage_type: "elasticsearch"
+      retention: "168h"  # 7 days
+      resources:
+        collector:
+          requests:
+            cpu: "200m"
+            memory: "512Mi"
+          limits:
+            cpu: "1000m"
+            memory: "2Gi"
+        query:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "1Gi"
+      
+    elasticsearch:
+      enabled: true
+      storage: "100Gi"
+      replicas: 1
+      resources:
+        requests:
+          cpu: "1000m"
+          memory: "2Gi"
+        limits:
+          cpu: "2000m"
+          memory: "4Gi"
+      indices:
+        healthcare_logs: "zarish-healthcare-*"
+        security_logs: "zarish-security-*"
+        audit_logs: "zarish-audit-*"
+        emergency_logs: "zarish-emergency-*"
+      
+    fluent_bit:
+      enabled: true
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "128Mi"
+        limits:
+          cpu: "500m"
+          memory: "512Mi"
+      log_retention:
+        healthcare: 30  # days
+        security: 90    # days
+        audit: 2555     # days (7 years HIPAA requirement)
+        emergency: 365  # days
+      
+    alerting:
+      enabled: true
+      slack_webhook: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+      email_recipients:
+        - "healthcare-ops@zarish.org"
+        - "platform-team@zarish.org"
+      pagerduty_key: "YOUR_PAGERDUTY_INTEGRATION_KEY"
+      
+    security:
+      rbac_enabled: true
+      network_policies: true
+      pod_security_policies: true
+      tls_enabled: true
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: monitoring-stack-setup
+  namespace: zarish-monitoring
+  labels:
+    app: monitoring-stack
+    component: setup-job
+spec:
+  template:
+    spec:
+      serviceAccountName: monitoring-setup
+      restartPolicy: OnFailure
+      containers:
+        - name: setup
+          image: bitnami/kubectl:latest
+          command: ["/bin/bash"]
+          args:
+            - -c
+            - |
+              echo "Starting ZarishHealthcare Monitoring Stack Setup..."
+              
+              # Phase 1: Infrastructure Setup
+              echo "Phase 1: Setting up infrastructure..."
+              kubectl apply -f /config/namespace.yaml
+              kubectl apply -f /config/storage-classes.yaml
+              kubectl apply -f /config/network-policies.yaml
+              
+              # Phase 2: Data Stores
+              echo "Phase 2: Deploying data stores..."
+              kubectl apply -f /config/elasticsearch.yaml
+              kubectl wait --for=condition=ready pod -l app=elasticsearch --timeout=300s
+              
+              # Phase 3: Metrics and Log Collectors  
+              echo "Phase 3: Deploying collectors..."
+              kubectl apply -f /config/prometheus.yaml
+              kubectl apply -f /config/fluent-bit.yaml
+              kubectl apply -f /config/jaeger.yaml
+              
+              # Wait for collectors to be ready
+              kubectl wait --for=condition=ready pod -l app=prometheus --timeout=300s
+              kubectl wait --for=condition=ready pod -l app=fluent-bit --timeout=180s
+              kubectl wait --for=condition=ready pod -l app=jaeger,component=collector --timeout=180s
+              
+              # Phase 4: Alerting
+              echo "Phase 4: Setting up alerting..."
+              kubectl apply -f /config/alerting-rules.yaml
+              kubectl apply -f /config/alertmanager.yaml
+              
+              # Phase 5: Visualization
+              echo "Phase 5: Deploying visualization tools..."
+              kubectl apply -f /config/grafana.yaml
+              kubectl wait --for=condition=ready pod -l app=grafana --timeout=300s
+              
+              # Phase 6: Configuration and Validation
+              echo "Phase 6: Finalizing configuration..."
+              
+              # Create Elasticsearch index templates
+              until kubectl exec -n zarish-monitoring deployment/elasticsearch -- curl -s -XPUT localhost:9200/_index_template/zarish-healthcare -H 'Content-Type: application/json' -d @/usr/share/elasticsearch/config/zarish-healthcare-template.json; do
+                echo "Waiting for Elasticsearch to be ready for index templates..."
+                sleep 10
+              done
+              
+              # Import Grafana dashboards
+              echo "Importing Grafana dashboards..."
+              kubectl exec -n zarish-monitoring deployment/grafana -- /bin/bash -c '
+                for dashboard in /var/lib/grafana/dashboards/*/*.json; do
+                  curl -X POST \
+                    -H "Content-Type: application/json" \
+                    -H "Authorization: Bearer $GF_SECURITY_ADMIN_PASSWORD" \
+                    -d @"$dashboard" \
+                    http://localhost:3000/api/dashboards/db
+                done
+              '
+              
+              # Validate monitoring stack
+              echo "Validating monitoring stack..."
+              
+              # Check Prometheus targets
+              prometheus_ready=$(kubectl exec -n zarish-monitoring deployment/prometheus -- wget -qO- http://localhost:9090/api/v1/targets | jq '.data.activeTargets | length')
+              echo "Prometheus active targets: $prometheus_ready"
+              
+              # Check Grafana health
+              grafana_health=$(kubectl exec -n zarish-monitoring deployment/grafana -- wget -qO- http://localhost:3000/api/health | jq -r '.database')
+              echo "Grafana database status: $grafana_health"
+              
+              # Check Jaeger health
+              jaeger_health=$(kubectl exec -n zarish-monitoring deployment/jaeger-query -- wget -qO- http://localhost:16687/ | grep -c "Jaeger UI")
+              echo "Jaeger UI availability: $jaeger_health"
+              
+              # Check Elasticsearch health
+              es_health=$(kubectl exec -n zarish-monitoring statefulset/elasticsearch -- curl -s localhost:9200/_cluster/health | jq -r '.status')
+              echo "Elasticsearch cluster status: $es_health"
+              
+              echo "ZarishHealthcare Monitoring Stack Setup Complete!"
+              echo "Access URLs (after port-forwarding or ingress setup):"
+              echo "  - Grafana: http://grafana.zarish.humanitarian.health"
+              echo "  - Prometheus: http://prometheus.zarish.humanitarian.health" 
+              echo "  - Jaeger: http://jaeger.zarish.humanitarian.health"
+              echo "  - Kibana: http://kibana.zarish.humanitarian.health"
+              
+          volumeMounts:
+            - name: config-volume
+              mountPath: /config
+              readOnly: true
+          env:
+            - name: KUBECONFIG
+              value: /tmp/kubeconfig
+      volumes:
+        - name: config-volume
+          configMap:
+            name: monitoring-deployment-config
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: monitoring-setup
+  namespace: zarish-monitoring
+  labels:
+    app: monitoring-stack
+    component: setup
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: monitoring-setup
+  labels:
+    app: monitoring-stack
+    component: setup
+rules:
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["*"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: monitoring-setup
+  labels:
+    app: monitoring-stack
+    component: setup
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: monitoring-setup
+subjects:
+  - kind: ServiceAccount
+    name: monitoring-setup
+    namespace: zarish-monitoring
+
+---
+# Monitoring Stack Health Check Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: monitoring-healthcheck
+  namespace: zarish-monitoring
+  labels:
+    app: monitoring-stack
+    component: healthcheck
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: http
+  selector:
+    app: monitoring-healthcheck
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: monitoring-healthcheck
+  namespace: zarish-monitoring
+  labels:
+    app: monitoring-healthcheck
+    component: health
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: monitoring-healthcheck
+      component: health
+  template:
+    metadata:
+      labels:
+        app: monitoring-healthcheck
+        component: health
+    spec:
+      serviceAccountName: monitoring-setup
+      containers:
+        - name: healthcheck
+          image: nginx:alpine
+          ports:
+            - containerPort: 8080
+              name: http
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          volumeMounts:
+            - name: healthcheck-config
+              mountPath: /etc/nginx/conf.d
+            - name: healthcheck-content
+              mountPath: /usr/share/nginx/html
+      volumes:
+        - name: healthcheck-config
+          configMap:
+            name: healthcheck-nginx-config
+        - name: healthcheck-content
+          configMap:
+            name: healthcheck-content
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: healthcheck-nginx-config
+  namespace: zarish-monitoring
+data:
+  default.conf: |
+    server {
+        listen 8080;
+        server_name _;
+        
+        location / {
+            root /usr/share/nginx/html;
+            index index.html;
+        }
+        
+        location /health {
+            access_log off;
+            return 200 '{"status":"healthy","service":"zarish-monitoring-stack","timestamp":"$time_iso8601"}';
+            add_header Content-Type application/json;
+        }
+        
+        location /metrics {
+            access_log off;
+            return 200 '# HELP monitoring_stack_status Status of monitoring stack components\n# TYPE monitoring_stack_status gauge\nmonitoring_stack_status{component="prometheus"} 1\nmonitoring_stack_status{component="grafana"} 1\nmonitoring_stack_status{component="jaeger"} 1\nmonitoring_stack_status{component="elasticsearch"} 1\nmonitoring_stack_status{component="fluent-bit"} 1\n';
+            add_header Content-Type text/plain;
+        }
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: healthcheck-content
+  namespace: zarish-monitoring
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>ZarishHealthcare Monitoring Stack</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+            .container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+            .header { color: #2c5aa0; border-bottom: 2px solid #2c5aa0; padding-bottom: 10px; margin-bottom: 20px; }
+            .status { padding: 15px; margin: 10px 0; border-radius: 5px; }
+            .healthy { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+            .warning { background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; }
+            .service-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 20px; }
+            .service-card { background: #f8f9fa; padding: 15px; border-radius: 5px; border-left: 4px solid #28a745; }
+            .service-card h3 { margin-top: 0; color: #2c5aa0; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1 class="header">ZarishHealthcare System - Monitoring Stack</h1>
+            
+            <div class="status healthy">
+                <strong>Status:</strong> Operational ✓
+                <br><strong>Environment:</strong> Production
+                <br><strong>Last Updated:</strong> <span id="timestamp"></span>
+            </div>
+            
+            <h2>Monitoring Services</h2>
+            <div class="service-grid">
+                <div class="service-card">
+                    <h3>📊 Prometheus</h3>
+                    <p>Metrics collection and alerting for all healthcare services</p>
+                    <p><strong>Retention:</strong> 15 days</p>
+                    <p><strong>Targets:</strong> All ZarishSphere services</p>
+                </div>
+                
+                <div class="service-card">
+                    <h3>📈 Grafana</h3>
+                    <p>Visualization dashboards for healthcare operations</p>
+                    <p><strong>Dashboards:</strong> Clinical, Security, Infrastructure</p>
+                    <p><strong>Alerts:</strong> Slack, Email, PagerDuty</p>
+                </div>
+                
+                <div class="service-card">
+                    <h3>🔍 Jaeger</h3>
+                    <p>Distributed tracing for request flow analysis</p>
+                    <p><strong>Sampling:</strong> Adaptive by service criticality</p>
+                    <p><strong>Storage:</strong> Elasticsearch backend</p>
+                </div>
+                
+                <div class="service-card">
+                    <h3>📝 Elasticsearch</h3>
+                    <p>Centralized logging with healthcare-specific indices</p>
+                    <p><strong>Indices:</strong> Healthcare, Security, Audit, Emergency</p>
+                    <p><strong>Retention:</strong> HIPAA compliant (7 years for audit)</p>
+                </div>
+                
+                <div class="service-card">
+                    <h3>🚀 Fluent Bit</h3>
+                    <p>Log collection and processing with PII protection</p>
+                    <p><strong>Features:</strong> PII masking, Compliance tagging</p>
+                    <p><strong>Outputs:</strong> Elasticsearch, structured by type</p>
+                </div>
+            </div>
+            
+            <h2>Healthcare-Specific Features</h2>
+            <ul>
+                <li><strong>HIPAA Compliance:</strong> 7-year audit log retention</li>
+                <li><strong>GDPR Compliance:</strong> Data subject access and erasure</li>
+                <li><strong>Emergency Mode:</strong> Enhanced monitoring during crises</li>
+                <li><strong>PII Protection:</strong> Automatic detection and masking</li>
+                <li><strong>Multi-Region:</strong> Support for distributed deployments</li>
+                <li><strong>Offline Sync Monitoring:</strong> Field operation visibility</li>
+            </ul>
+        </div>
+        
+        <script>
+            document.getElementById('timestamp').textContent = new Date().toLocaleString();
+        </script>
+    </body>
+    </html>

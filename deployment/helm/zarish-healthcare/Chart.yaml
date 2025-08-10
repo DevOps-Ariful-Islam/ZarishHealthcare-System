@@ -1,0 +1,82 @@
+# ZarishHealthcare System Helm Chart
+# Humanitarian healthcare microservices deployment chart
+
+apiVersion: v2
+name: zarish-healthcare
+description: A Helm chart for ZarishHealthcare System - Humanitarian Healthcare Platform
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - healthcare
+  - humanitarian
+  - microservices
+  - zarish
+  - medical
+  - emergency-response
+home: https://zarish.humanitarian.health
+sources:
+  - https://github.com/zarish-sphere/zarish-healthcare-system
+maintainers:
+  - name: ZarishSphere Healthcare Team
+    email: healthcare@zarish.org
+    url: https://zarish.org
+icon: https://zarish.org/assets/zarish-healthcare-icon.png
+
+annotations:
+  category: Healthcare
+  licenses: MIT
+  compliance: "HIPAA,GDPR,WHO-Standards"
+  humanitarian.zarish.org/emergency-ready: "true"
+  humanitarian.zarish.org/offline-capable: "true"
+  humanitarian.zarish.org/multi-region: "true"
+
+dependencies:
+  - name: postgresql
+    version: "12.6.6"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+    tags:
+      - zarish-database
+  
+  - name: redis
+    version: "17.11.3"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+    tags:
+      - zarish-cache
+  
+  - name: couchdb
+    version: "4.3.0"
+    repository: https://apache.github.io/couchdb-helm
+    condition: couchdb.enabled
+    tags:
+      - zarish-sync
+  
+  - name: prometheus
+    version: "23.1.0"
+    repository: https://prometheus-community.github.io/helm-charts
+    condition: monitoring.prometheus.enabled
+    tags:
+      - zarish-monitoring
+  
+  - name: grafana
+    version: "6.57.4"
+    repository: https://grafana.github.io/helm-charts
+    condition: monitoring.grafana.enabled
+    tags:
+      - zarish-monitoring
+  
+  - name: jaeger
+    version: "0.71.2"
+    repository: https://jaegertracing.github.io/helm-charts
+    condition: monitoring.jaeger.enabled
+    tags:
+      - zarish-monitoring
+
+  - name: elasticsearch
+    version: "8.5.1"
+    repository: https://helm.elastic.co
+    condition: logging.elasticsearch.enabled
+    tags:
+      - zarish-logging

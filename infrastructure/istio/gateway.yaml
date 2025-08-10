@@ -1,0 +1,606 @@
+# Istio Gateway Configuration for ZarishHealthcare System
+# Provides secure ingress for humanitarian healthcare services
+
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: zarish-healthcare-gateway
+  namespace: zarish-healthcare
+  labels:
+    app: zarish-gateway
+    version: v1
+    environment: production
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    # HTTPS Production Traffic
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+      tls:
+        mode: SIMPLE
+        credentialName: zarish-healthcare-tls
+      hosts:
+        - "api.zarish.humanitarian.health"
+        - "dashboard.zarish.humanitarian.health"
+        - "mobile.zarish.humanitarian.health"
+        - "sync.zarish.humanitarian.health"
+        - "*.zarish.org"
+
+    # HTTP Redirect to HTTPS
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "api.zarish.humanitarian.health"
+        - "dashboard.zarish.humanitarian.health"
+        - "mobile.zarish.humanitarian.health"
+        - "sync.zarish.humanitarian.health"
+        - "*.zarish.org"
+
+---
+# Virtual Service for ZarishHealthcare System
+# Routes traffic to appropriate microservices based on path and host
+
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: zarish-healthcare-routes
+  namespace: zarish-healthcare
+  labels:
+    app: zarish-routes
+    version: v1
+    environment: production
+spec:
+  hosts:
+    - "api.zarish.humanitarian.health"
+    - "dashboard.zarish.humanitarian.health"
+    - "mobile.zarish.humanitarian.health"
+    - "sync.zarish.humanitarian.health"
+  gateways:
+    - zarish-healthcare-gateway
+  http:
+    # Redirect HTTP to HTTPS
+    - match:
+        - port: 80
+      redirect:
+        scheme: https
+        redirectCode: 301
+
+    # Authentication Service Routes
+    - match:
+        - uri:
+            prefix: /auth
+        - uri:
+            prefix: /api/v1/users
+        - uri:
+            prefix: /api/v1/roles
+        - uri:
+            prefix: /api/v1/permissions
+        - uri:
+            prefix: /api/v1/sessions
+        - uri:
+            prefix: /api/v1/audit
+      route:
+        - destination:
+            host: zarish-access.zarish-healthcare.svc.cluster.local
+            port:
+              number: 3005
+      timeout: 30s
+      retries:
+        attempts: 3
+        perTryTimeout: 10s
+        retryOn: 5xx,reset,connect-failure,refused-stream
+
+    # Clinical Management Service Routes
+    - match:
+        - uri:
+            prefix: /api/v1/patients
+        - uri:
+            prefix: /api/v1/clinical
+        - uri:
+            prefix: /api/v1/consultations
+        - uri:
+            prefix: /api/v1/appointments
+        - uri:
+            prefix: /api/v1/medical-records
+      route:
+        - destination:
+            host: zarish-care.zarish-healthcare.svc.cluster.local
+            port:
+              number: 3001
+      timeout: 60s
+      retries:
+        attempts: 3
+        perTryTimeout: 20s
+        retryOn: 5xx,reset,connect-failure,refused-stream
+
+    # Laboratory Management Service Routes
+    - match:
+        - uri:
+            prefix: /api/v1/orders
+        - uri:
+            prefix: /api/v1/results
+        - uri:
+            prefix: /api/v1/tests
+        - uri:
+            prefix: /api/v1/equipment
+        - uri:
+            prefix: /api/v1/reagents
+        - uri:
+            prefix: /api/v1/quality-control
+      route:
+        - destination:
+            host: zarish-labs.zarish-healthcare.svc.cluster.local
+            port:
+              number: 3002
+      timeout: 60s
+      retries:
+        attempts: 3
+        perTryTimeout: 20s
+        retryOn: 5xx,reset,connect-failure,refused-stream
+
+    # Operations Coordination Service Routes
+    - match:
+        - uri:
+            prefix: /api/v1/activities
+        - uri:
+            prefix: /api/v1/resources
+        - uri:
+            prefix: /api/v1/partners
+        - uri:
+            prefix: /api/v1/reports
+        - uri:
+            prefix: /api/v1/emergency
+        - uri:
+            prefix: /api/v1/coordination
+      route:
+        - destination:
+            host: zarish-ops.zarish-healthcare.svc.cluster.local
+            port:
+              number: 3003
+      timeout: 60s
+      retries:
+        attempts: 2
+        perTryTimeout: 30s
+        retryOn: 5xx,reset,connect-failure,refused-stream
+
+    # Analytics Service Routes
+    - match:
+        - uri:
+            prefix: /api/v1/dashboards
+        - uri:
+            prefix: /api/v1/metrics
+        - uri:
+            prefix: /api/v1/trends
+        - uri:
+            prefix: /api/v1/predictions
+        - uri:
+            prefix: /api/v1/population-health
+      route:
+        - destination:
+            host: zarish-analytics.zarish-healthcare.svc.cluster.local
+            port:
+              number: 3004
+      timeout: 120s
+      retries:
+        attempts: 2
+        perTryTimeout: 60s
+        retryOn: 5xx,reset,connect-failure,refused-stream
+
+    # Synchronization Service Routes
+    - match:
+        - uri:
+            prefix: /api/v1/sync
+        - uri:
+            prefix: /api/v1/conflicts
+        - uri:
+            prefix: /api/v1/replication
+      route:
+        - destination:
+            host: zarish-sync.zarish-healthcare.svc.cluster.local
+            port:
+              number: 3006
+      timeout: 300s
+      retries:
+        attempts: 2
+        perTryTimeout: 150s
+        retryOn: 5xx,reset,connect-failure,refused-stream
+
+    # Frontend Application Routes
+    - match:
+        - uri:
+            prefix: /dashboard
+        - headers:
+            host:
+              exact: "dashboard.zarish.humanitarian.health"
+      route:
+        - destination:
+            host: zarish-dashboard.zarish-healthcare.svc.cluster.local
+            port:
+              number: 3000
+      timeout: 30s
+
+    # Mobile API Routes
+    - match:
+        - headers:
+            host:
+              exact: "mobile.zarish.humanitarian.health"
+      route:
+        - destination:
+            host: zarish-mobile-backend.zarish-healthcare.svc.cluster.local
+            port:
+              number: 3007
+      timeout: 60s
+
+    # Sync-specific Routes
+    - match:
+        - headers:
+            host:
+              exact: "sync.zarish.humanitarian.health"
+      route:
+        - destination:
+            host: zarish-sync.zarish-healthcare.svc.cluster.local
+            port:
+              number: 3006
+      timeout: 600s  # 10 minutes for large sync operations
+
+    # Health Check Routes
+    - match:
+        - uri:
+            exact: /health
+        - uri:
+            exact: /readiness
+        - uri:
+            exact: /liveness
+      route:
+        - destination:
+            host: zarish-gateway-health.zarish-healthcare.svc.cluster.local
+            port:
+              number: 8080
+      timeout: 5s
+
+    # Fallback Route - Default to Clinical Dashboard
+    - route:
+        - destination:
+            host: zarish-dashboard.zarish-healthcare.svc.cluster.local
+            port:
+              number: 3000
+      timeout: 30s
+
+---
+# Destination Rules for Traffic Policies
+# Defines load balancing, circuit breaker, and connection pool settings
+
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: zarish-healthcare-destination-rules
+  namespace: zarish-healthcare
+  labels:
+    app: zarish-destination-rules
+    version: v1
+    environment: production
+spec:
+  host: "*.zarish-healthcare.svc.cluster.local"
+  trafficPolicy:
+    # Connection Pool Settings
+    connectionPool:
+      tcp:
+        maxConnections: 100
+        connectTimeout: 30s
+        keepalive:
+          time: 7200s
+          interval: 75s
+      http:
+        http1MaxPendingRequests: 100
+        http2MaxRequests: 1000
+        maxRequestsPerConnection: 10
+        maxRetries: 3
+        consecutiveGatewayErrors: 5
+        h2UpgradePolicy: UPGRADE
+
+    # Load Balancer Settings
+    loadBalancer:
+      simple: LEAST_CONN
+
+    # Outlier Detection
+    outlierDetection:
+      consecutiveGatewayErrors: 5
+      consecutive5xxErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 30
+
+  # Service-specific policies
+  portLevelSettings:
+    # Authentication Service - Conservative Settings
+    - port:
+        number: 3005
+      connectionPool:
+        tcp:
+          maxConnections: 50
+          connectTimeout: 10s
+        http:
+          http1MaxPendingRequests: 50
+          maxRequestsPerConnection: 5
+      outlierDetection:
+        consecutive5xxErrors: 3
+        interval: 15s
+        baseEjectionTime: 60s
+
+    # Sync Service - Aggressive Settings
+    - port:
+        number: 3006
+      connectionPool:
+        tcp:
+          maxConnections: 20
+          connectTimeout: 60s
+          keepalive:
+            time: 14400s  # 4 hours
+        http:
+          http1MaxPendingRequests: 20
+          maxRequestsPerConnection: 2
+          idleTimeout: 300s
+          h2UpgradePolicy: DO_NOT_UPGRADE
+      outlierDetection:
+        consecutive5xxErrors: 2
+        interval: 60s
+        baseEjectionTime: 300s
+
+    # Analytics Service - Moderate Settings
+    - port:
+        number: 3004
+      connectionPool:
+        tcp:
+          maxConnections: 75
+          connectTimeout: 45s
+        http:
+          http1MaxPendingRequests: 75
+          maxRequestsPerConnection: 8
+          idleTimeout: 60s
+      outlierDetection:
+        consecutive5xxErrors: 4
+        interval: 30s
+        baseEjectionTime: 45s
+
+---
+# Service Entry for External Dependencies
+# Allows controlled access to external services
+
+apiVersion: networking.istio.io/v1beta1
+kind: ServiceEntry
+metadata:
+  name: external-dependencies
+  namespace: zarish-healthcare
+  labels:
+    app: external-services
+    version: v1
+    environment: production
+spec:
+  hosts:
+    - who.int
+    - api.who.int
+    - dhis2.org
+    - api.dhis2.org
+    - humanitarian.id
+    - api.humanitarian.id
+    - reliefweb.int
+    - api.reliefweb.int
+    - google-analytics.com
+    - googleapis.com
+    - maps.googleapis.com
+  ports:
+    - number: 80
+      name: http
+      protocol: HTTP
+    - number: 443
+      name: https
+      protocol: HTTPS
+  location: MESH_EXTERNAL
+  resolution: DNS
+
+---
+# PeerAuthentication for mTLS
+# Enforces mutual TLS between services
+
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default-mtls
+  namespace: zarish-healthcare
+  labels:
+    app: zarish-security
+    version: v1
+    environment: production
+spec:
+  mtls:
+    mode: STRICT
+
+---
+# AuthorizationPolicy for RBAC
+# Role-Based Access Control for healthcare services
+
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: zarish-healthcare-rbac
+  namespace: zarish-healthcare
+  labels:
+    app: zarish-rbac
+    version: v1
+    environment: production
+spec:
+  rules:
+    # Allow health checks from anywhere
+    - to:
+        - operation:
+            paths: ["/health", "/readiness", "/liveness"]
+
+    # Allow authentication service access
+    - to:
+        - operation:
+            paths: ["/auth/*", "/api/v1/users/*", "/api/v1/sessions/*"]
+      from:
+        - source:
+            namespaces: ["zarish-healthcare", "zarish-gateway"]
+
+    # Clinical data access - requires authentication
+    - to:
+        - operation:
+            paths: ["/api/v1/patients/*", "/api/v1/clinical/*", "/api/v1/consultations/*"]
+      from:
+        - source:
+            principals: ["cluster.local/ns/zarish-healthcare/sa/clinical-staff"]
+            namespaces: ["zarish-healthcare"]
+      when:
+        - key: request.headers[authorization]
+          values: ["Bearer *"]
+
+    # Laboratory access - lab technicians and clinicians
+    - to:
+        - operation:
+            paths: ["/api/v1/orders/*", "/api/v1/results/*", "/api/v1/tests/*"]
+      from:
+        - source:
+            principals: 
+              - "cluster.local/ns/zarish-healthcare/sa/lab-technician"
+              - "cluster.local/ns/zarish-healthcare/sa/clinical-staff"
+            namespaces: ["zarish-healthcare"]
+      when:
+        - key: request.headers[authorization]
+          values: ["Bearer *"]
+
+    # Operations access - coordinators and managers
+    - to:
+        - operation:
+            paths: ["/api/v1/activities/*", "/api/v1/resources/*", "/api/v1/partners/*"]
+      from:
+        - source:
+            principals:
+              - "cluster.local/ns/zarish-healthcare/sa/operations-coordinator"
+              - "cluster.local/ns/zarish-healthcare/sa/program-manager"
+            namespaces: ["zarish-healthcare"]
+      when:
+        - key: request.headers[authorization]
+          values: ["Bearer *"]
+
+    # Analytics access - analysts and managers
+    - to:
+        - operation:
+            paths: ["/api/v1/dashboards/*", "/api/v1/metrics/*", "/api/v1/trends/*"]
+      from:
+        - source:
+            principals:
+              - "cluster.local/ns/zarish-healthcare/sa/data-analyst"
+              - "cluster.local/ns/zarish-healthcare/sa/program-manager"
+              - "cluster.local/ns/zarish-healthcare/sa/clinical-staff"
+            namespaces: ["zarish-healthcare"]
+      when:
+        - key: request.headers[authorization]
+          values: ["Bearer *"]
+
+    # Sync access - authenticated users with sync permissions
+    - to:
+        - operation:
+            paths: ["/api/v1/sync/*", "/api/v1/conflicts/*", "/api/v1/replication/*"]
+      from:
+        - source:
+            namespaces: ["zarish-healthcare"]
+      when:
+        - key: request.headers[authorization]
+          values: ["Bearer *"]
+        - key: request.headers[x-sync-token]
+          values: ["*"]
+
+    # Emergency access - bypass some restrictions in emergencies
+    - to:
+        - operation:
+            paths: ["/api/v1/emergency/*"]
+      from:
+        - source:
+            namespaces: ["zarish-healthcare"]
+      when:
+        - key: request.headers[x-emergency-mode]
+          values: ["true"]
+        - key: request.headers[authorization]
+          values: ["Bearer *"]
+
+    # Inter-service communication
+    - to:
+        - operation:
+            methods: ["GET", "POST", "PUT", "PATCH", "DELETE"]
+      from:
+        - source:
+            principals:
+              - "cluster.local/ns/zarish-healthcare/sa/zarish-care"
+              - "cluster.local/ns/zarish-healthcare/sa/zarish-labs"
+              - "cluster.local/ns/zarish-healthcare/sa/zarish-ops"
+              - "cluster.local/ns/zarish-healthcare/sa/zarish-analytics"
+              - "cluster.local/ns/zarish-healthcare/sa/zarish-access"
+              - "cluster.local/ns/zarish-healthcare/sa/zarish-sync"
+            namespaces: ["zarish-healthcare"]
+
+    # Deny all other traffic
+    - action: DENY
+      to:
+        - operation: {}
+
+---
+# Telemetry Configuration
+# Configures metrics, logging, and tracing
+
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: zarish-healthcare-telemetry
+  namespace: zarish-healthcare
+  labels:
+    app: zarish-telemetry
+    version: v1
+    environment: production
+spec:
+  metrics:
+    - providers:
+        - name: prometheus
+    - overrides:
+        - match:
+            metric: ALL_METRICS
+          tagOverrides:
+            destination_service_name:
+              value: "%{DESTINATION_SERVICE_NAME}"
+            source_app:
+              value: "%{SOURCE_APP}"
+            destination_app:
+              value: "%{DESTINATION_APP}"
+            request_protocol:
+              value: "%{REQUEST_PROTOCOL}"
+            response_code:
+              value: "%{RESPONSE_CODE}"
+            method:
+              value: "%{REQUEST_METHOD}"
+            path:
+              value: "%{REQUEST_URL_PATH}"
+            user_id:
+              value: "%{REQUEST_HEADERS['x-user-id']}"
+            organization:
+              value: "%{REQUEST_HEADERS['x-organization-id']}"
+            emergency_mode:
+              value: "%{REQUEST_HEADERS['x-emergency-mode']}"
+
+  accessLogging:
+    providers:
+      - name: otel
+    - match:
+        mode: CLIENT
+    - match:
+        mode: SERVER
+
+  tracing:
+    - providers:
+        - name: jaeger
+    - randomSamplingPercentage: 1.0  # 1% sampling in production

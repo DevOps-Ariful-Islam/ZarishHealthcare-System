@@ -1,0 +1,120 @@
+ariful@lenovo:~$ uname -a
+Linux lenovo 6.14.0-27-generic #27~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Tue Jul 22 17:38:49 UTC 2 x86_64 x86_64 x86_64 GNU/Linux
+
+ariful@lenovo:~$ hostnamectl
+ Static hostname: lenovo
+       Icon name: computer-laptop
+         Chassis: laptop 💻
+      Machine ID: b85a0d08dc1149ee8736b93e250877dc
+         Boot ID: 5aa56eaf5b854e30920486f6d86de457
+Operating System: Ubuntu 24.04.3 LTS              
+          Kernel: Linux 6.14.0-27-generic
+    Architecture: x86-64
+ Hardware Vendor: Lenovo
+  Hardware Model: IdeaPad Slim 3 15IAH8
+Firmware Version: LTCN40WW
+   Firmware Date: Wed 2025-06-04
+    Firmware Age: 2month 6d
+ariful@lenovo:~$ lscpu
+Architecture:             x86_64
+  CPU op-mode(s):         32-bit, 64-bit
+  Address sizes:          39 bits physical, 48 bits virtual
+  Byte Order:             Little Endian
+CPU(s):                   12
+  On-line CPU(s) list:    0-11
+Vendor ID:                GenuineIntel
+  Model name:             12th Gen Intel(R) Core(TM) i5-12450H
+    CPU family:           6
+    Model:                154
+    Thread(s) per core:   2
+    Core(s) per socket:   8
+    Socket(s):            1
+    Stepping:             3
+    CPU(s) scaling MHz:   44%
+    CPU max MHz:          2000.0000
+    CPU min MHz:          400.0000
+    BogoMIPS:             4992.00
+    Flags:                fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge m
+                          ca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 s
+                          s ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc 
+                          art arch_perfmon pebs bts rep_good nopl xtopology nons
+                          top_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq 
+                          dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma c
+                          x16 xtpr pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt t
+                          sc_deadline_timer aes xsave avx f16c rdrand lahf_lm ab
+                          m 3dnowprefetch cpuid_fault epb ssbd ibrs ibpb stibp i
+                          brs_enhanced tpr_shadow flexpriority ept vpid ept_ad f
+                          sgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid rd
+                          seed adx smap clflushopt clwb intel_pt sha_ni xsaveopt
+                           xsavec xgetbv1 xsaves split_lock_detect user_shstk av
+                          x_vnni dtherm ida arat pln pts hwp hwp_notify hwp_act_
+                          window hwp_epp hwp_pkg_req hfi vnmi umip pku ospke wai
+                          tpkg gfni vaes vpclmulqdq rdpid movdiri movdir64b fsrm
+                           md_clear serialize arch_lbr ibt flush_l1d arch_capabi
+                          lities
+Virtualization features:  
+  Virtualization:         VT-x
+Caches (sum of all):      
+  L1d:                    320 KiB (8 instances)
+  L1i:                    384 KiB (8 instances)
+  L2:                     7 MiB (5 instances)
+  L3:                     12 MiB (1 instance)
+NUMA:                     
+  NUMA node(s):           1
+  NUMA node0 CPU(s):      0-11
+Vulnerabilities:          
+  Gather data sampling:   Not affected
+  Ghostwrite:             Not affected
+  Itlb multihit:          Not affected
+  L1tf:                   Not affected
+  Mds:                    Not affected
+  Meltdown:               Not affected
+  Mmio stale data:        Not affected
+  Reg file data sampling: Mitigation; Clear Register File
+  Retbleed:               Not affected
+  Spec rstack overflow:   Not affected
+  Spec store bypass:      Mitigation; Speculative Store Bypass disabled via prct
+                          l
+  Spectre v1:             Mitigation; usercopy/swapgs barriers and __user pointe
+                          r sanitization
+  Spectre v2:             Mitigation; Enhanced / Automatic IBRS; IBPB conditiona
+                          l; PBRSB-eIBRS SW sequence; BHI BHI_DIS_S
+  Srbds:                  Not affected
+  Tsx async abort:        Not affected
+ariful@lenovo:~$ timedatectl status
+               Local time: Sun 2025-08-10 23:44:10 +06
+           Universal time: Sun 2025-08-10 17:44:10 UTC
+                 RTC time: Sun 2025-08-10 17:44:10
+                Time zone: Asia/Dhaka (+06, +0600)
+System clock synchronized: yes
+              NTP service: active
+          RTC in local TZ: no
+ariful@lenovo:~$ df -h
+Filesystem      Size  Used Avail Use% Mounted on
+tmpfs           764M  5.5M  758M   1% /run
+/dev/nvme0n1p2  468G   59G  385G  14% /
+tmpfs           3.8G   20M  3.8G   1% /dev/shm
+tmpfs           5.0M  8.0K  5.0M   1% /run/lock
+efivarfs        268K  104K  160K  40% /sys/firmware/efi/efivars
+/dev/nvme0n1p1  1.1G   15M  1.1G   2% /boot/efi
+tmpfs           764M  140K  764M   1% /run/user/1000
+ariful@lenovo:~$ free -m
+               total        used        free      shared  buff/cache   available
+Mem:            7633        2308        3078         463        3015        5325
+Swap:           4095           0        4095
+
+
+ariful@lenovo:~$ ls
+Desktop  Documents  Downloads  Music  Pictures  Public  snap  Templates  Videos
+
+
+ariful@lenovo:~$ ls -a
+.              .config    .fontconfig  .pki         .sudo_as_admin_successful
+..             Desktop    .gitconfig   .profile     Templates
+.bash_history  .docker    .gnupg       Public       Videos
+.bash_logout   Documents  .local       snap         .vscode
+.bashrc        .dotnet    Music        .sqlsecrets
+.cache         Downloads  Pictures     .ssh
+ariful@lenovo:~$ 
+
+

@@ -1,0 +1,459 @@
+# Prometheus Alerting Rules for ZarishHealthcare System
+# Comprehensive healthcare-specific monitoring and alerting
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: zarish-monitoring
+  labels:
+    app: prometheus
+    component: rules
+data:
+  healthcare-service-alerts.yml: |
+    groups:
+      - name: zarish-healthcare-services
+        rules:
+          # Service Availability Alerts
+          - alert: ZarishCareServiceDown
+            expr: up{job="zarish-care"} == 0
+            for: 2m
+            labels:
+              severity: critical
+              service: zarish-care
+              category: availability
+              impact: high
+              humanitarian_priority: emergency
+            annotations:
+              summary: "ZarishCare clinical management service is down"
+              description: "ZarishCare service has been down for more than 2 minutes. This affects patient care delivery in {{ $labels.instance }}"
+              runbook_url: "https://docs.zarish.org/runbooks/zarish-care-down"
+              impact: "Critical clinical operations affected. Patients cannot be registered or treated."
+
+          - alert: ZarishLabsServiceDown
+            expr: up{job="zarish-labs"} == 0
+            for: 2m
+            labels:
+              severity: critical
+              service: zarish-labs
+              category: availability
+              impact: high
+              humanitarian_priority: emergency
+            annotations:
+              summary: "ZarishLabs laboratory service is down"
+              description: "ZarishLabs service has been down for more than 2 minutes. Laboratory operations are affected in {{ $labels.instance }}"
+              runbook_url: "https://docs.zarish.org/runbooks/zarish-labs-down"
+              impact: "Laboratory test ordering and result delivery stopped."
+
+          - alert: ZarishOpsServiceDown
+            expr: up{job="zarish-ops"} == 0
+            for: 3m
+            labels:
+              severity: warning
+              service: zarish-ops
+              category: availability
+              impact: medium
+              humanitarian_priority: high
+            annotations:
+              summary: "ZarishOps coordination service is down"
+              description: "ZarishOps service has been down for more than 3 minutes. Inter-agency coordination affected in {{ $labels.instance }}"
+              runbook_url: "https://docs.zarish.org/runbooks/zarish-ops-down"
+              impact: "Multi-partner coordination and resource allocation affected."
+
+          - alert: ZarishAccessServiceDown
+            expr: up{job="zarish-access"} == 0
+            for: 1m
+            labels:
+              severity: critical
+              service: zarish-access
+              category: availability
+              impact: critical
+              humanitarian_priority: emergency
+            annotations:
+              summary: "ZarishAccess authentication service is down"
+              description: "ZarishAccess service has been down for more than 1 minute. User authentication is failing in {{ $labels.instance }}"
+              runbook_url: "https://docs.zarish.org/runbooks/zarish-access-down"
+              impact: "All services inaccessible. Complete system lockout."
+
+          - alert: ZarishSyncServiceDown
+            expr: up{job="zarish-sync"} == 0
+            for: 5m
+            labels:
+              severity: warning
+              service: zarish-sync
+              category: availability
+              impact: medium
+              humanitarian_priority: high
+            annotations:
+              summary: "ZarishSync offline synchronization service is down"
+              description: "ZarishSync service has been down for more than 5 minutes. Offline synchronization affected in {{ $labels.instance }}"
+              runbook_url: "https://docs.zarish.org/runbooks/zarish-sync-down"
+              impact: "Field devices cannot sync data. Offline operations compromised."
+
+          # High Response Time Alerts
+          - alert: ZarishCareHighResponseTime
+            expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="zarish-care"}[5m])) > 2
+            for: 10m
+            labels:
+              severity: warning
+              service: zarish-care
+              category: performance
+              impact: medium
+              humanitarian_priority: medium
+            annotations:
+              summary: "ZarishCare service has high response time"
+              description: "95th percentile response time is {{ $value }}s for ZarishCare service {{ $labels.instance }}"
+              runbook_url: "https://docs.zarish.org/runbooks/high-response-time"
+              impact: "Patient care workflows are slow. User experience degraded."
+
+          - alert: ZarishLabsHighResponseTime
+            expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="zarish-labs"}[5m])) > 5
+            for: 10m
+            labels:
+              severity: warning
+              service: zarish-labs
+              category: performance
+              impact: medium
+              humanitarian_priority: medium
+            annotations:
+              summary: "ZarishLabs service has high response time"
+              description: "95th percentile response time is {{ $value }}s for ZarishLabs service {{ $labels.instance }}"
+              runbook_url: "https://docs.zarish.org/runbooks/high-response-time"
+              impact: "Laboratory results delivery delayed. Clinical decisions affected."
+
+          # High Error Rate Alerts
+          - alert: ZarishCareHighErrorRate
+            expr: rate(http_requests_total{job="zarish-care",status=~"5.."}[5m]) / rate(http_requests_total{job="zarish-care"}[5m]) > 0.05
+            for: 5m
+            labels:
+              severity: critical
+              service: zarish-care
+              category: reliability
+              impact: high
+              humanitarian_priority: emergency
+            annotations:
+              summary: "ZarishCare service has high error rate"
+              description: "Error rate is {{ $value | humanizePercentage }} for ZarishCare service {{ $labels.instance }}"
+              runbook_url: "https://docs.zarish.org/runbooks/high-error-rate"
+              impact: "Clinical operations failing. Patient safety at risk."
+
+          - alert: ZarishAccessHighErrorRate
+            expr: rate(http_requests_total{job="zarish-access",status=~"5.."}[5m]) / rate(http_requests_total{job="zarish-access"}[5m]) > 0.02
+            for: 2m
+            labels:
+              severity: critical
+              service: zarish-access
+              category: reliability
+              impact: critical
+              humanitarian_priority: emergency
+            annotations:
+              summary: "ZarishAccess service has high error rate"
+              description: "Error rate is {{ $value | humanizePercentage }} for ZarishAccess service {{ $labels.instance }}"
+              runbook_url: "https://docs.zarish.org/runbooks/high-error-rate"
+              impact: "Authentication failures increasing. System access compromised."
+
+          # Memory Usage Alerts
+          - alert: ZarishServiceHighMemoryUsage
+            expr: (container_memory_usage_bytes{pod=~"zarish-.*"} / container_spec_memory_limit_bytes{pod=~"zarish-.*"}) > 0.8
+            for: 10m
+            labels:
+              severity: warning
+              service: "{{ $labels.pod }}"
+              category: resources
+              impact: medium
+              humanitarian_priority: medium
+            annotations:
+              summary: "{{ $labels.pod }} has high memory usage"
+              description: "Memory usage is {{ $value | humanizePercentage }} for {{ $labels.pod }}"
+              runbook_url: "https://docs.zarish.org/runbooks/high-memory-usage"
+              impact: "Service performance degradation risk. Potential out-of-memory errors."
+
+          # CPU Usage Alerts
+          - alert: ZarishServiceHighCPUUsage
+            expr: rate(container_cpu_usage_seconds_total{pod=~"zarish-.*"}[5m]) > 0.8
+            for: 15m
+            labels:
+              severity: warning
+              service: "{{ $labels.pod }}"
+              category: resources
+              impact: medium
+              humanitarian_priority: medium
+            annotations:
+              summary: "{{ $labels.pod }} has high CPU usage"
+              description: "CPU usage is {{ $value | humanizePercentage }} for {{ $labels.pod }}"
+              runbook_url: "https://docs.zarish.org/runbooks/high-cpu-usage"
+              impact: "Service performance degraded. Response times may increase."
+
+  database-alerts.yml: |
+    groups:
+      - name: zarish-healthcare-database
+        rules:
+          # PostgreSQL Alerts
+          - alert: PostgreSQLDown
+            expr: pg_up == 0
+            for: 2m
+            labels:
+              severity: critical
+              service: postgresql
+              category: availability
+              impact: critical
+              humanitarian_priority: emergency
+            annotations:
+              summary: "PostgreSQL database is down"
+              description: "PostgreSQL database {{ $labels.instance }} has been down for more than 2 minutes"
+              runbook_url: "https://docs.zarish.org/runbooks/postgresql-down"
+              impact: "Complete system failure. All healthcare data inaccessible."
+
+          - alert: PostgreSQLHighConnections
+            expr: pg_stat_activity_count / pg_settings_max_connections > 0.8
+            for: 5m
+            labels:
+              severity: warning
+              service: postgresql
+              category: resources
+              impact: medium
+              humanitarian_priority: medium
+            annotations:
+              summary: "PostgreSQL has high number of connections"
+              description: "PostgreSQL {{ $labels.instance }} is using {{ $value | humanizePercentage }} of max connections"
+              runbook_url: "https://docs.zarish.org/runbooks/postgresql-high-connections"
+              impact: "New connections may be rejected. Services may fail to connect."
+
+          - alert: PostgreSQLSlowQueries
+            expr: pg_stat_activity_max_tx_duration > 300
+            for: 5m
+            labels:
+              severity: warning
+              service: postgresql
+              category: performance
+              impact: medium
+              humanitarian_priority: medium
+            annotations:
+              summary: "PostgreSQL has slow running queries"
+              description: "PostgreSQL {{ $labels.instance }} has queries running longer than 5 minutes"
+              runbook_url: "https://docs.zarish.org/runbooks/postgresql-slow-queries"
+              impact: "Database performance degraded. Application timeouts likely."
+
+          - alert: PostgreSQLReplicationLag
+            expr: pg_replication_lag > 30
+            for: 5m
+            labels:
+              severity: warning
+              service: postgresql
+              category: reliability
+              impact: medium
+              humanitarian_priority: medium
+            annotations:
+              summary: "PostgreSQL replication lag is high"
+              description: "PostgreSQL replica {{ $labels.instance }} is lagging by {{ $value }}s"
+              runbook_url: "https://docs.zarish.org/runbooks/postgresql-replication-lag"
+              impact: "Data consistency risk. Failover capability compromised."
+
+          # Redis Alerts
+          - alert: RedisDown
+            expr: redis_up == 0
+            for: 2m
+            labels:
+              severity: critical
+              service: redis
+              category: availability
+              impact: high
+              humanitarian_priority: high
+            annotations:
+              summary: "Redis cache is down"
+              description: "Redis instance {{ $labels.instance }} has been down for more than 2 minutes"
+              runbook_url: "https://docs.zarish.org/runbooks/redis-down"
+              impact: "Caching unavailable. Significant performance degradation."
+
+          - alert: RedisHighMemoryUsage
+            expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+            for: 5m
+            labels:
+              severity: warning
+              service: redis
+              category: resources
+              impact: medium
+              humanitarian_priority: medium
+            annotations:
+              summary: "Redis has high memory usage"
+              description: "Redis {{ $labels.instance }} memory usage is {{ $value | humanizePercentage }}"
+              runbook_url: "https://docs.zarish.org/runbooks/redis-high-memory"
+              impact: "Cache performance degraded. Eviction risk."
+
+          - alert: RedisHighConnections
+            expr: redis_connected_clients > 1000
+            for: 5m
+            labels:
+              severity: warning
+              service: redis
+              category: resources
+              impact: medium
+              humanitarian_priority: medium
+            annotations:
+              summary: "Redis has high number of connections"
+              description: "Redis {{ $labels.instance }} has {{ $value }} connected clients"
+              runbook_url: "https://docs.zarish.org/runbooks/redis-high-connections"
+              impact: "Connection pool exhaustion risk."
+
+          # CouchDB Alerts
+          - alert: CouchDBDown
+            expr: couchdb_up == 0
+            for: 5m
+            labels:
+              severity: warning
+              service: couchdb
+              category: availability
+              impact: medium
+              humanitarian_priority: high
+            annotations:
+              summary: "CouchDB offline sync database is down"
+              description: "CouchDB instance {{ $labels.instance }} has been down for more than 5 minutes"
+              runbook_url: "https://docs.zarish.org/runbooks/couchdb-down"
+              impact: "Offline synchronization unavailable. Field operations compromised."
+
+  security-alerts.yml: |
+    groups:
+      - name: zarish-healthcare-security
+        rules:
+          # Authentication Alerts
+          - alert: HighFailedAuthentications
+            expr: increase(zarish_auth_failed_attempts_total[5m]) > 50
+            for: 2m
+            labels:
+              severity: warning
+              service: zarish-access
+              category: security
+              impact: medium
+              humanitarian_priority: high
+            annotations:
+              summary: "High number of failed authentication attempts"
+              description: "{{ $value }} failed authentication attempts in the last 5 minutes from {{ $labels.instance }}"
+              runbook_url: "https://docs.zarish.org/runbooks/failed-auth"
+              impact: "Potential brute force attack. Account lockout risk."
+
+          - alert: SuspiciousLoginActivity
+            expr: increase(zarish_auth_suspicious_login_total[10m]) > 10
+            for: 1m
+            labels:
+              severity: critical
+              service: zarish-access
+              category: security
+              impact: high
+              humanitarian_priority: emergency
+            annotations:
+              summary: "Suspicious login activity detected"
+              description: "{{ $value }} suspicious login attempts detected from {{ $labels.instance }}"
+              runbook_url: "https://docs.zarish.org/runbooks/suspicious-login"
+              impact: "Potential security breach. Immediate investigation required."
+
+          - alert: UnauthorizedAPIAccess
+            expr: increase(http_requests_total{status="403"}[5m]) > 100
+            for: 3m
+            labels:
+              severity: warning
+              service: api-gateway
+              category: security
+              impact: medium
+              humanitarian_priority: medium
+            annotations:
+              summary: "High number of unauthorized API access attempts"
+              description: "{{ $value }} unauthorized API access attempts from {{ $labels.instance }}"
+              runbook_url: "https://docs.zarish.org/runbooks/unauthorized-access"
+              impact: "Potential API abuse or misconfigured clients."
+
+          # Data Security Alerts
+          - alert: PatientDataAccessAnomaly
+            expr: increase(zarish_patient_data_access_total[1h]) > 1000
+            for: 5m
+            labels:
+              severity: warning
+              service: zarish-care
+              category: security
+              impact: high
+              humanitarian_priority: high
+            annotations:
+              summary: "Anomalous patient data access pattern"
+              description: "{{ $value }} patient data access requests in the last hour from {{ $labels.instance }}"
+              runbook_url: "https://docs.zarish.org/runbooks/data-access-anomaly"
+              impact: "Potential data breach or bulk data extraction."
+
+  humanitarian-alerts.yml: |
+    groups:
+      - name: zarish-humanitarian-operations
+        rules:
+          # Emergency Response Alerts
+          - alert: EmergencyModeActivated
+            expr: zarish_emergency_mode_active == 1
+            for: 0m
+            labels:
+              severity: info
+              service: zarish-ops
+              category: operations
+              impact: high
+              humanitarian_priority: emergency
+            annotations:
+              summary: "Emergency response mode activated"
+              description: "Emergency mode has been activated in {{ $labels.location }}"
+              runbook_url: "https://docs.zarish.org/runbooks/emergency-mode"
+              impact: "System operating in emergency protocols. Enhanced monitoring required."
+
+          - alert: CriticalPatientAlert
+            expr: zarish_critical_patients_total > 10
+            for: 1m
+            labels:
+              severity: critical
+              service: zarish-care
+              category: clinical
+              impact: critical
+              humanitarian_priority: emergency
+            annotations:
+              summary: "High number of critical patients"
+              description: "{{ $value }} critical patients currently registered in {{ $labels.facility }}"
+              runbook_url: "https://docs.zarish.org/runbooks/critical-patients"
+              impact: "Mass casualty event possible. Medical surge response needed."
+
+          - alert: SupplyShortageAlert
+            expr: zarish_supply_stock_ratio < 0.1
+            for: 5m
+            labels:
+              severity: warning
+              service: zarish-ops
+              category: supplies
+              impact: high
+              humanitarian_priority: high
+            annotations:
+              summary: "Critical supply shortage detected"
+              description: "{{ $labels.supply_type }} stock is at {{ $value | humanizePercentage }} in {{ $labels.facility }}"
+              runbook_url: "https://docs.zarish.org/runbooks/supply-shortage"
+              impact: "Healthcare delivery at risk. Immediate resupply required."
+
+          - alert: OfflineFacilityAlert
+            expr: zarish_facility_offline_duration_minutes > 240
+            for: 0m
+            labels:
+              severity: critical
+              service: zarish-sync
+              category: connectivity
+              impact: high
+              humanitarian_priority: emergency
+            annotations:
+              summary: "Healthcare facility offline for extended period"
+              description: "{{ $labels.facility }} has been offline for {{ $value }} minutes"
+              runbook_url: "https://docs.zarish.org/runbooks/facility-offline"
+              impact: "Patient care documentation and coordination compromised."
+
+          # Population Health Alerts
+          - alert: DiseaseOutbreakAlert
+            expr: zarish_disease_case_rate_increase > 2
+            for: 10m
+            labels:
+              severity: critical
+              service: zarish-analytics
+              category: epidemiology
+              impact: critical
+              humanitarian_priority: emergency
+            annotations:
+              summary: "Potential disease outbreak detected"
+              description: "{{ $labels.disease }} case rate increased by {{ $value }}x in {{ $labels.location }}"
+              runbook_url: "https://docs.zarish.org/runbooks/disease-outbreak"
+              impact: "Public health emergency. Epidemic response protocols activated."

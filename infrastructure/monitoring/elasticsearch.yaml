@@ -1,0 +1,677 @@
+# Elasticsearch Configuration for ZarishHealthcare System
+# Centralized logging and search for humanitarian healthcare services
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: elasticsearch-config
+  namespace: zarish-monitoring
+  labels:
+    app: elasticsearch
+    component: config
+data:
+  elasticsearch.yml: |
+    # Cluster Configuration
+    cluster.name: zarish-healthcare-logs
+    node.name: ${HOSTNAME}
+    node.data: true
+    node.master: true
+    node.ingest: true
+    
+    # Network Configuration
+    network.host: 0.0.0.0
+    http.port: 9200
+    transport.tcp.port: 9300
+    http.cors.enabled: true
+    http.cors.allow-origin: "*"
+    http.cors.allow-headers: "X-Requested-With,Content-Type,Content-Length,Authorization"
+    
+    # Discovery Configuration
+    discovery.type: single-node
+    discovery.seed_hosts: []
+    cluster.initial_master_nodes: []
+    
+    # Security Configuration
+    xpack.security.enabled: false
+    xpack.monitoring.enabled: false
+    xpack.ml.enabled: false
+    xpack.watcher.enabled: false
+    xpack.graph.enabled: false
+    
+    # Index Management
+    action.destructive_requires_name: true
+    action.auto_create_index: true
+    
+    # Memory and Performance
+    indices.memory.index_buffer_size: 30%
+    indices.queries.cache.size: 20%
+    indices.fielddata.cache.size: 40%
+    
+    # Logging Configuration
+    logger.level: INFO
+    logger.deprecation.level: WARN
+    
+    # Index Lifecycle Management
+    xpack.ilm.enabled: false
+    
+    # Healthcare-specific Index Templates
+    index.number_of_shards: 3
+    index.number_of_replicas: 1
+    index.refresh_interval: 30s
+    index.translog.durability: async
+    index.translog.sync_interval: 30s
+    
+  log4j2.properties: |
+    status = error
+    
+    appender.console.type = Console
+    appender.console.name = console
+    appender.console.layout.type = PatternLayout
+    appender.console.layout.pattern = [%d{ISO8601}][%-5p][%-25c{1.}] [%node_name]%marker %m%n
+    
+    rootLogger.level = info
+    rootLogger.appenderRef.console.ref = console
+    
+    logger.deprecation.name = org.elasticsearch.deprecation
+    logger.deprecation.level = warn
+    logger.deprecation.appenderRef.console.ref = console
+    logger.deprecation.additivity = false
+
+---
+# Elasticsearch StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: elasticsearch
+  namespace: zarish-monitoring
+  labels:
+    app: elasticsearch
+    component: server
+spec:
+  serviceName: elasticsearch
+  replicas: 1
+  selector:
+    matchLabels:
+      app: elasticsearch
+      component: server
+  template:
+    metadata:
+      labels:
+        app: elasticsearch
+        component: server
+    spec:
+      serviceAccountName: elasticsearch
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+        runAsGroup: 1000
+      initContainers:
+        - name: configure-sysctl
+          image: docker.elastic.co/elasticsearch/elasticsearch:8.8.0
+          command: ["sh", "-c", "sysctl -w vm.max_map_count=262144"]
+          securityContext:
+            privileged: true
+            runAsUser: 0
+        - name: volume-permissions
+          image: docker.elastic.co/elasticsearch/elasticsearch:8.8.0
+          command: ["sh", "-c", "chown -R 1000:1000 /usr/share/elasticsearch/data"]
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: data
+              mountPath: /usr/share/elasticsearch/data
+      containers:
+        - name: elasticsearch
+          image: docker.elastic.co/elasticsearch/elasticsearch:8.8.0
+          ports:
+            - containerPort: 9200
+              name: http
+              protocol: TCP
+            - containerPort: 9300
+              name: transport
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 1000m
+              memory: 2Gi
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+          env:
+            - name: node.name
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: cluster.initial_master_nodes
+              value: "elasticsearch-0"
+            - name: discovery.seed_hosts
+              value: "elasticsearch-headless"
+            - name: cluster.name
+              value: "zarish-healthcare-logs"
+            - name: network.host
+              value: "0.0.0.0"
+            - name: ES_JAVA_OPTS
+              value: "-Xms2g -Xmx2g"
+            - name: xpack.security.enabled
+              value: "false"
+            - name: xpack.monitoring.enabled
+              value: "false"
+          volumeMounts:
+            - name: data
+              mountPath: /usr/share/elasticsearch/data
+            - name: config
+              mountPath: /usr/share/elasticsearch/config/elasticsearch.yml
+              subPath: elasticsearch.yml
+            - name: config
+              mountPath: /usr/share/elasticsearch/config/log4j2.properties
+              subPath: log4j2.properties
+          livenessProbe:
+            httpGet:
+              path: /_cluster/health
+              port: 9200
+            initialDelaySeconds: 60
+            timeoutSeconds: 30
+            periodSeconds: 30
+            successThreshold: 1
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /_cluster/health?wait_for_status=yellow&timeout=5s
+              port: 9200
+            initialDelaySeconds: 30
+            timeoutSeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 3
+      volumes:
+        - name: config
+          configMap:
+            name: elasticsearch-config
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          app: elasticsearch
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: fast-ssd
+        resources:
+          requests:
+            storage: 100Gi
+
+---
+# Elasticsearch Services
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch
+  namespace: zarish-monitoring
+  labels:
+    app: elasticsearch
+    component: server
+  annotations:
+    prometheus.io/scrape: 'true'
+    prometheus.io/port: '9200'
+    prometheus.io/path: '/_prometheus/metrics'
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9200
+      targetPort: 9200
+      protocol: TCP
+      name: http
+    - port: 9300
+      targetPort: 9300
+      protocol: TCP
+      name: transport
+  selector:
+    app: elasticsearch
+    component: server
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch-headless
+  namespace: zarish-monitoring
+  labels:
+    app: elasticsearch
+    component: server
+spec:
+  clusterIP: None
+  ports:
+    - port: 9200
+      targetPort: 9200
+      protocol: TCP
+      name: http
+    - port: 9300
+      targetPort: 9300
+      protocol: TCP
+      name: transport
+  selector:
+    app: elasticsearch
+    component: server
+
+---
+# Elasticsearch ServiceAccount and RBAC
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: elasticsearch
+  namespace: zarish-monitoring
+  labels:
+    app: elasticsearch
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: elasticsearch
+  labels:
+    app: elasticsearch
+rules:
+  - apiGroups: [""]
+    resources:
+      - nodes
+      - services
+      - endpoints
+      - pods
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: elasticsearch
+  labels:
+    app: elasticsearch
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: elasticsearch
+subjects:
+  - kind: ServiceAccount
+    name: elasticsearch
+    namespace: zarish-monitoring
+
+---
+# Index Templates for Healthcare Logs
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: elasticsearch-index-templates
+  namespace: zarish-monitoring
+  labels:
+    app: elasticsearch
+    component: index-templates
+data:
+  zarish-healthcare-template.json: |
+    {
+      "index_patterns": ["zarish-healthcare-*"],
+      "template": {
+        "settings": {
+          "number_of_shards": 3,
+          "number_of_replicas": 1,
+          "index.refresh_interval": "30s",
+          "index.translog.durability": "async",
+          "index.translog.sync_interval": "30s",
+          "index.lifecycle.name": "zarish-healthcare-policy",
+          "index.lifecycle.rollover_alias": "zarish-healthcare"
+        },
+        "mappings": {
+          "properties": {
+            "@timestamp": {
+              "type": "date",
+              "format": "strict_date_optional_time||epoch_millis"
+            },
+            "level": {
+              "type": "keyword"
+            },
+            "message": {
+              "type": "text",
+              "fields": {
+                "keyword": {
+                  "type": "keyword",
+                  "ignore_above": 256
+                }
+              }
+            },
+            "service": {
+              "type": "keyword"
+            },
+            "namespace": {
+              "type": "keyword"
+            },
+            "pod": {
+              "type": "keyword"
+            },
+            "container": {
+              "type": "keyword"
+            },
+            "node": {
+              "type": "keyword"
+            },
+            "facility_id": {
+              "type": "keyword"
+            },
+            "organization_id": {
+              "type": "keyword"
+            },
+            "user_id": {
+              "type": "keyword"
+            },
+            "patient_id": {
+              "type": "keyword"
+            },
+            "trace_id": {
+              "type": "keyword"
+            },
+            "span_id": {
+              "type": "keyword"
+            },
+            "request_id": {
+              "type": "keyword"
+            },
+            "emergency_mode": {
+              "type": "boolean"
+            },
+            "compliance_tags": {
+              "type": "keyword"
+            },
+            "data_classification": {
+              "type": "keyword"
+            },
+            "audit_event": {
+              "type": "boolean"
+            },
+            "security_event": {
+              "type": "boolean"
+            },
+            "clinical_event": {
+              "type": "boolean"
+            },
+            "sync_event": {
+              "type": "boolean"
+            },
+            "location": {
+              "properties": {
+                "country": {
+                  "type": "keyword"
+                },
+                "region": {
+                  "type": "keyword"
+                },
+                "facility": {
+                  "type": "keyword"
+                },
+                "coordinates": {
+                  "type": "geo_point"
+                }
+              }
+            },
+            "http": {
+              "properties": {
+                "method": {
+                  "type": "keyword"
+                },
+                "status_code": {
+                  "type": "integer"
+                },
+                "url": {
+                  "type": "text",
+                  "fields": {
+                    "keyword": {
+                      "type": "keyword",
+                      "ignore_above": 256
+                    }
+                  }
+                },
+                "user_agent": {
+                  "type": "text",
+                  "fields": {
+                    "keyword": {
+                      "type": "keyword",
+                      "ignore_above": 256
+                    }
+                  }
+                },
+                "remote_addr": {
+                  "type": "ip"
+                },
+                "response_time": {
+                  "type": "float"
+                }
+              }
+            },
+            "error": {
+              "properties": {
+                "type": {
+                  "type": "keyword"
+                },
+                "message": {
+                  "type": "text"
+                },
+                "stack_trace": {
+                  "type": "text"
+                }
+              }
+            },
+            "database": {
+              "properties": {
+                "query_time": {
+                  "type": "float"
+                },
+                "rows_affected": {
+                  "type": "integer"
+                },
+                "query_type": {
+                  "type": "keyword"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+  zarish-security-template.json: |
+    {
+      "index_patterns": ["zarish-security-*"],
+      "template": {
+        "settings": {
+          "number_of_shards": 2,
+          "number_of_replicas": 2,
+          "index.refresh_interval": "10s",
+          "index.translog.durability": "request",
+          "index.lifecycle.name": "zarish-security-policy",
+          "index.lifecycle.rollover_alias": "zarish-security"
+        },
+        "mappings": {
+          "properties": {
+            "@timestamp": {
+              "type": "date",
+              "format": "strict_date_optional_time||epoch_millis"
+            },
+            "event_type": {
+              "type": "keyword"
+            },
+            "severity": {
+              "type": "keyword"
+            },
+            "user": {
+              "properties": {
+                "id": {
+                  "type": "keyword"
+                },
+                "email": {
+                  "type": "keyword"
+                },
+                "role": {
+                  "type": "keyword"
+                },
+                "organization": {
+                  "type": "keyword"
+                },
+                "ip_address": {
+                  "type": "ip"
+                }
+              }
+            },
+            "auth": {
+              "properties": {
+                "method": {
+                  "type": "keyword"
+                },
+                "success": {
+                  "type": "boolean"
+                },
+                "failure_reason": {
+                  "type": "keyword"
+                },
+                "session_id": {
+                  "type": "keyword"
+                },
+                "mfa_used": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "access": {
+              "properties": {
+                "resource": {
+                  "type": "keyword"
+                },
+                "action": {
+                  "type": "keyword"
+                },
+                "granted": {
+                  "type": "boolean"
+                },
+                "reason": {
+                  "type": "keyword"
+                }
+              }
+            },
+            "threat": {
+              "properties": {
+                "type": {
+                  "type": "keyword"
+                },
+                "confidence": {
+                  "type": "float"
+                },
+                "mitre_technique": {
+                  "type": "keyword"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+  zarish-audit-template.json: |
+    {
+      "index_patterns": ["zarish-audit-*"],
+      "template": {
+        "settings": {
+          "number_of_shards": 2,
+          "number_of_replicas": 2,
+          "index.refresh_interval": "5s",
+          "index.translog.durability": "request",
+          "index.lifecycle.name": "zarish-audit-policy",
+          "index.lifecycle.rollover_alias": "zarish-audit"
+        },
+        "mappings": {
+          "properties": {
+            "@timestamp": {
+              "type": "date",
+              "format": "strict_date_optional_time||epoch_millis"
+            },
+            "audit_type": {
+              "type": "keyword"
+            },
+            "actor": {
+              "properties": {
+                "user_id": {
+                  "type": "keyword"
+                },
+                "session_id": {
+                  "type": "keyword"
+                },
+                "ip_address": {
+                  "type": "ip"
+                },
+                "user_agent": {
+                  "type": "text",
+                  "fields": {
+                    "keyword": {
+                      "type": "keyword",
+                      "ignore_above": 256
+                    }
+                  }
+                }
+              }
+            },
+            "action": {
+              "type": "keyword"
+            },
+            "resource": {
+              "properties": {
+                "type": {
+                  "type": "keyword"
+                },
+                "id": {
+                  "type": "keyword"
+                },
+                "name": {
+                  "type": "text",
+                  "fields": {
+                    "keyword": {
+                      "type": "keyword",
+                      "ignore_above": 256
+                    }
+                  }
+                }
+              }
+            },
+            "patient_data_access": {
+              "properties": {
+                "patient_id": {
+                  "type": "keyword"
+                },
+                "data_type": {
+                  "type": "keyword"
+                },
+                "phi_accessed": {
+                  "type": "boolean"
+                },
+                "purpose": {
+                  "type": "keyword"
+                }
+              }
+            },
+            "compliance": {
+              "properties": {
+                "hipaa_applicable": {
+                  "type": "boolean"
+                },
+                "gdpr_applicable": {
+                  "type": "boolean"
+                },
+                "data_subject_rights": {
+                  "type": "keyword"
+                }
+              }
+            },
+            "outcome": {
+              "type": "keyword"
+            },
+            "details": {
+              "type": "object",
+              "enabled": false
+            }
+          }
+        }
+      }
+    }

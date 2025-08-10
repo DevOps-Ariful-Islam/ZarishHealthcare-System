@@ -1,0 +1,605 @@
+# Kong Declarative Configuration for ZarishHealthcare System
+# API Gateway configuration for humanitarian healthcare microservices
+
+_format_version: "3.0"
+_transform: true
+
+services:
+  # ZarishCare - Clinical Management Service
+  - name: zarish-care
+    url: http://zarish-care:3001
+    path: /care
+    protocol: http
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 5
+    tags:
+      - healthcare
+      - clinical
+      - humanitarian
+
+  # ZarishLabs - Laboratory Management Service  
+  - name: zarish-labs
+    url: http://zarish-labs:3002
+    path: /labs
+    protocol: http
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 5
+    tags:
+      - healthcare
+      - laboratory
+      - diagnostics
+
+  # ZarishOps - Operations Coordination Service
+  - name: zarish-ops
+    url: http://zarish-ops:3003
+    path: /ops
+    protocol: http
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 5
+    tags:
+      - operations
+      - coordination
+      - humanitarian
+
+  # ZarishAnalytix - Analytics and Reporting Service
+  - name: zarish-analytics
+    url: http://zarish-analytics:3004
+    path: /analytics
+    protocol: http
+    connect_timeout: 120000  # Longer timeout for analytics
+    write_timeout: 120000
+    read_timeout: 120000
+    retries: 3
+    tags:
+      - analytics
+      - reporting
+      - intelligence
+
+  # ZarishAccess - Identity and Access Management Service
+  - name: zarish-access
+    url: http://zarish-access:3005
+    path: /auth
+    protocol: http
+    connect_timeout: 30000
+    write_timeout: 30000
+    read_timeout: 30000
+    retries: 5
+    tags:
+      - security
+      - authentication
+      - access-control
+
+  # ZarishSync - Offline Synchronization Service
+  - name: zarish-sync
+    url: http://zarish-sync:3006
+    path: /sync
+    protocol: http
+    connect_timeout: 300000  # Very long timeout for sync operations
+    write_timeout: 300000
+    read_timeout: 300000
+    retries: 2
+    tags:
+      - synchronization
+      - offline
+      - replication
+
+routes:
+  # Clinical Management Routes
+  - name: clinical-api
+    service: zarish-care
+    paths:
+      - /api/v1/patients
+      - /api/v1/clinical
+      - /api/v1/consultations
+      - /api/v1/appointments
+      - /api/v1/medical-records
+    methods:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+    strip_path: false
+    preserve_host: false
+    tags:
+      - clinical
+      - patient-care
+
+  # Laboratory Management Routes
+  - name: laboratory-api
+    service: zarish-labs
+    paths:
+      - /api/v1/orders
+      - /api/v1/results
+      - /api/v1/tests
+      - /api/v1/equipment
+      - /api/v1/reagents
+      - /api/v1/quality-control
+    methods:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+    strip_path: false
+    preserve_host: false
+    tags:
+      - laboratory
+      - diagnostics
+
+  # Operations Coordination Routes
+  - name: operations-api
+    service: zarish-ops
+    paths:
+      - /api/v1/activities
+      - /api/v1/resources
+      - /api/v1/partners
+      - /api/v1/reports
+      - /api/v1/emergency
+      - /api/v1/coordination
+    methods:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+    strip_path: false
+    preserve_host: false
+    tags:
+      - operations
+      - coordination
+
+  # Analytics and Reporting Routes
+  - name: analytics-api
+    service: zarish-analytics
+    paths:
+      - /api/v1/dashboards
+      - /api/v1/reports
+      - /api/v1/metrics
+      - /api/v1/trends
+      - /api/v1/predictions
+      - /api/v1/population-health
+    methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+    strip_path: false
+    preserve_host: false
+    tags:
+      - analytics
+      - reporting
+
+  # Authentication Routes
+  - name: auth-api
+    service: zarish-access
+    paths:
+      - /auth
+      - /api/v1/users
+      - /api/v1/roles
+      - /api/v1/permissions
+      - /api/v1/sessions
+      - /api/v1/audit
+    methods:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+    strip_path: false
+    preserve_host: false
+    tags:
+      - authentication
+      - security
+
+  # Synchronization Routes
+  - name: sync-api
+    service: zarish-sync
+    paths:
+      - /api/v1/sync
+      - /api/v1/conflicts
+      - /api/v1/replication
+    methods:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+    strip_path: false
+    preserve_host: false
+    tags:
+      - synchronization
+      - offline
+
+  # Health Check Routes (Public)
+  - name: health-checks
+    paths:
+      - /health
+    methods:
+      - GET
+    plugins:
+      - name: request-termination
+        config:
+          status_code: 200
+          content_type: application/json
+          body: '{"status": "healthy", "service": "zarish-gateway", "timestamp": "{{.now}}"}'
+    tags:
+      - health
+      - monitoring
+
+plugins:
+  # Global CORS Plugin
+  - name: cors
+    config:
+      origins:
+        - http://localhost:3000
+        - http://localhost:4200
+        - https://zarish.humanitarian.health
+        - https://dashboard.zarish.org
+      methods:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+      headers:
+        - Accept
+        - Authorization
+        - Content-Type
+        - X-Request-ID
+        - X-Device-ID
+        - X-Sync-Token
+        - X-Emergency-Mode
+      exposed_headers:
+        - X-Request-ID
+        - X-Rate-Limit-Remaining
+        - X-Sync-Status
+      credentials: true
+      max_age: 3600
+
+  # Global Rate Limiting
+  - name: rate-limiting
+    config:
+      minute: 1000
+      hour: 10000
+      day: 100000
+      policy: redis
+      redis_host: redis
+      redis_port: 6379
+      redis_database: 1
+      redis_timeout: 2000
+      redis_password: null
+      fault_tolerant: true
+      hide_client_headers: false
+
+  # Request/Response Logging
+  - name: http-log
+    config:
+      http_endpoint: http://logging-service:8080/kong-logs
+      method: POST
+      content_type: application/json
+      timeout: 10000
+      keepalive: 60000
+      retry_count: 3
+      queue_size: 1000
+      flush_timeout: 2
+
+  # Security Headers
+  - name: response-transformer
+    config:
+      add:
+        headers:
+          - "X-Content-Type-Options: nosniff"
+          - "X-Frame-Options: DENY"
+          - "X-XSS-Protection: 1; mode=block"
+          - "Referrer-Policy: strict-origin-when-cross-origin"
+          - "Content-Security-Policy: default-src 'self'"
+          - "Strict-Transport-Security: max-age=31536000; includeSubDomains"
+
+  # Request ID Generation
+  - name: request-id
+    config:
+      header_name: X-Request-ID
+      generator: uuid#counter
+      echo_downstream: true
+
+# Service-specific plugin configurations
+consumers:
+  # Emergency Services Consumer
+  - username: emergency-service
+    custom_id: emergency-001
+    tags:
+      - emergency
+      - system
+
+  # Mobile Application Consumer
+  - username: mobile-app
+    custom_id: mobile-001
+    tags:
+      - mobile
+      - client
+
+  # Web Dashboard Consumer
+  - username: web-dashboard
+    custom_id: web-001
+    tags:
+      - web
+      - dashboard
+
+  # Inter-service Communication Consumer
+  - username: service-mesh
+    custom_id: mesh-001
+    tags:
+      - internal
+      - service-mesh
+
+# Service-specific rate limiting
+plugins:
+  # Authentication Service - Stricter Rate Limiting
+  - name: rate-limiting
+    service: zarish-access
+    config:
+      minute: 100
+      hour: 1000
+      day: 10000
+      policy: redis
+      redis_host: redis
+      redis_port: 6379
+      redis_database: 2
+      fault_tolerant: true
+
+  # Sync Service - More Lenient for Large Operations
+  - name: rate-limiting
+    service: zarish-sync
+    config:
+      minute: 50
+      hour: 500
+      day: 5000
+      policy: redis
+      redis_host: redis
+      redis_port: 6379
+      redis_database: 3
+      fault_tolerant: true
+
+  # Analytics Service - Moderate Limits
+  - name: rate-limiting
+    service: zarish-analytics
+    config:
+      minute: 200
+      hour: 2000
+      day: 20000
+      policy: redis
+      redis_host: redis
+      redis_port: 6379
+      redis_database: 4
+      fault_tolerant: true
+
+  # JWT Authentication for Protected Routes
+  - name: jwt
+    route: clinical-api
+    config:
+      secret_is_base64: false
+      claims_to_verify:
+        - exp
+        - iss
+        - sub
+      key_claim_name: iss
+      anonymous: null
+      run_on_preflight: true
+
+  - name: jwt
+    route: laboratory-api
+    config:
+      secret_is_base64: false
+      claims_to_verify:
+        - exp
+        - iss
+        - sub
+      key_claim_name: iss
+      anonymous: null
+      run_on_preflight: true
+
+  - name: jwt
+    route: operations-api
+    config:
+      secret_is_base64: false
+      claims_to_verify:
+        - exp
+        - iss
+        - sub
+      key_claim_name: iss
+      anonymous: null
+      run_on_preflight: true
+
+  - name: jwt
+    route: analytics-api
+    config:
+      secret_is_base64: false
+      claims_to_verify:
+        - exp
+        - iss
+        - sub
+      key_claim_name: iss
+      anonymous: null
+      run_on_preflight: true
+
+  - name: jwt
+    route: sync-api
+    config:
+      secret_is_base64: false
+      claims_to_verify:
+        - exp
+        - iss
+        - sub
+      key_claim_name: iss
+      anonymous: null
+      run_on_preflight: true
+
+  # Request Size Limiting for Different Services
+  - name: request-size-limiting
+    service: zarish-care
+    config:
+      allowed_payload_size: 10  # 10MB for clinical data
+
+  - name: request-size-limiting
+    service: zarish-labs
+    config:
+      allowed_payload_size: 50  # 50MB for lab results and images
+
+  - name: request-size-limiting
+    service: zarish-sync
+    config:
+      allowed_payload_size: 500  # 500MB for sync operations
+
+  - name: request-size-limiting
+    service: zarish-analytics
+    config:
+      allowed_payload_size: 100  # 100MB for analytics data
+
+  # Response Caching for Analytics
+  - name: proxy-cache
+    service: zarish-analytics
+    config:
+      response_code:
+        - 200
+      request_method:
+        - GET
+      content_type:
+        - application/json
+      cache_ttl: 300  # 5 minutes
+      storage_ttl: 3600  # 1 hour
+
+# JWT Keys for Services
+jwt_secrets:
+  - consumer: emergency-service
+    key: emergency-jwt-key
+    secret: emergency-jwt-secret-change-in-production
+
+  - consumer: mobile-app
+    key: mobile-jwt-key
+    secret: mobile-jwt-secret-change-in-production
+
+  - consumer: web-dashboard
+    key: web-jwt-key
+    secret: web-jwt-secret-change-in-production
+
+  - consumer: service-mesh
+    key: mesh-jwt-key
+    secret: mesh-jwt-secret-change-in-production
+
+# Upstreams for Load Balancing
+upstreams:
+  - name: zarish-care-upstream
+    algorithm: round-robin
+    healthchecks:
+      active:
+        type: http
+        http_path: /health
+        healthy:
+          interval: 10
+          successes: 3
+        unhealthy:
+          interval: 10
+          http_failures: 3
+          tcp_failures: 3
+          timeouts: 3
+    targets:
+      - target: zarish-care:3001
+        weight: 100
+
+  - name: zarish-labs-upstream
+    algorithm: round-robin
+    healthchecks:
+      active:
+        type: http
+        http_path: /health
+        healthy:
+          interval: 10
+          successes: 3
+        unhealthy:
+          interval: 10
+          http_failures: 3
+          tcp_failures: 3
+          timeouts: 3
+    targets:
+      - target: zarish-labs:3002
+        weight: 100
+
+  - name: zarish-ops-upstream
+    algorithm: round-robin
+    healthchecks:
+      active:
+        type: http
+        http_path: /health
+        healthy:
+          interval: 10
+          successes: 3
+        unhealthy:
+          interval: 10
+          http_failures: 3
+          tcp_failures: 3
+          timeouts: 3
+    targets:
+      - target: zarish-ops:3003
+        weight: 100
+
+  - name: zarish-analytics-upstream
+    algorithm: round-robin
+    healthchecks:
+      active:
+        type: http
+        http_path: /health
+        healthy:
+          interval: 15
+          successes: 2
+        unhealthy:
+          interval: 15
+          http_failures: 3
+          tcp_failures: 3
+          timeouts: 3
+    targets:
+      - target: zarish-analytics:3004
+        weight: 100
+
+  - name: zarish-access-upstream
+    algorithm: round-robin
+    healthchecks:
+      active:
+        type: http
+        http_path: /health
+        healthy:
+          interval: 5
+          successes: 3
+        unhealthy:
+          interval: 5
+          http_failures: 2
+          tcp_failures: 2
+          timeouts: 2
+    targets:
+      - target: zarish-access:3005
+        weight: 100
+
+  - name: zarish-sync-upstream
+    algorithm: round-robin
+    healthchecks:
+      active:
+        type: http
+        http_path: /health
+        healthy:
+          interval: 20
+          successes: 2
+        unhealthy:
+          interval: 20
+          http_failures: 3
+          tcp_failures: 3
+          timeouts: 5
+    targets:
+      - target: zarish-sync:3006
+        weight: 100

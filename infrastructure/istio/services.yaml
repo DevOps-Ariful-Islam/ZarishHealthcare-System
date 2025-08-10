@@ -1,0 +1,625 @@
+# Kubernetes Service Definitions for ZarishHealthcare System
+# Service mesh integration for humanitarian healthcare microservices
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: zarish-care
+  namespace: zarish-healthcare
+  labels:
+    app: zarish-care
+    service: zarish-care
+    version: v1
+    environment: production
+    tier: backend
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  ports:
+    - port: 3001
+      targetPort: 3001
+      protocol: TCP
+      name: http
+    - port: 9090
+      targetPort: 9090
+      protocol: TCP
+      name: metrics
+  selector:
+    app: zarish-care
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zarish-labs
+  namespace: zarish-healthcare
+  labels:
+    app: zarish-labs
+    service: zarish-labs
+    version: v1
+    environment: production
+    tier: backend
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  ports:
+    - port: 3002
+      targetPort: 3002
+      protocol: TCP
+      name: http
+    - port: 9090
+      targetPort: 9090
+      protocol: TCP
+      name: metrics
+  selector:
+    app: zarish-labs
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zarish-ops
+  namespace: zarish-healthcare
+  labels:
+    app: zarish-ops
+    service: zarish-ops
+    version: v1
+    environment: production
+    tier: backend
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  ports:
+    - port: 3003
+      targetPort: 3003
+      protocol: TCP
+      name: http
+    - port: 9090
+      targetPort: 9090
+      protocol: TCP
+      name: metrics
+  selector:
+    app: zarish-ops
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zarish-analytics
+  namespace: zarish-healthcare
+  labels:
+    app: zarish-analytics
+    service: zarish-analytics
+    version: v1
+    environment: production
+    tier: backend
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  ports:
+    - port: 3004
+      targetPort: 3004
+      protocol: TCP
+      name: http
+    - port: 9090
+      targetPort: 9090
+      protocol: TCP
+      name: metrics
+  selector:
+    app: zarish-analytics
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zarish-access
+  namespace: zarish-healthcare
+  labels:
+    app: zarish-access
+    service: zarish-access
+    version: v1
+    environment: production
+    tier: backend
+    security: critical
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  ports:
+    - port: 3005
+      targetPort: 3005
+      protocol: TCP
+      name: http
+    - port: 9090
+      targetPort: 9090
+      protocol: TCP
+      name: metrics
+  selector:
+    app: zarish-access
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zarish-sync
+  namespace: zarish-healthcare
+  labels:
+    app: zarish-sync
+    service: zarish-sync
+    version: v1
+    environment: production
+    tier: backend
+    priority: high
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  ports:
+    - port: 3006
+      targetPort: 3006
+      protocol: TCP
+      name: http
+    - port: 9090
+      targetPort: 9090
+      protocol: TCP
+      name: metrics
+  selector:
+    app: zarish-sync
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zarish-dashboard
+  namespace: zarish-healthcare
+  labels:
+    app: zarish-dashboard
+    service: zarish-dashboard
+    version: v1
+    environment: production
+    tier: frontend
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  ports:
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP
+      name: http
+    - port: 9090
+      targetPort: 9090
+      protocol: TCP
+      name: metrics
+  selector:
+    app: zarish-dashboard
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zarish-mobile-backend
+  namespace: zarish-healthcare
+  labels:
+    app: zarish-mobile-backend
+    service: zarish-mobile-backend
+    version: v1
+    environment: production
+    tier: backend
+    client: mobile
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  ports:
+    - port: 3007
+      targetPort: 3007
+      protocol: TCP
+      name: http
+    - port: 9090
+      targetPort: 9090
+      protocol: TCP
+      name: metrics
+  selector:
+    app: zarish-mobile-backend
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zarish-gateway-health
+  namespace: zarish-healthcare
+  labels:
+    app: zarish-gateway-health
+    service: zarish-gateway-health
+    version: v1
+    environment: production
+    tier: gateway
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: http
+    - port: 9090
+      targetPort: 9090
+      protocol: TCP
+      name: metrics
+  selector:
+    app: zarish-gateway-health
+  type: ClusterIP
+
+---
+# Database Services
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql-primary
+  namespace: zarish-healthcare
+  labels:
+    app: postgresql
+    service: postgresql-primary
+    version: v1
+    environment: production
+    tier: database
+    role: primary
+spec:
+  ports:
+    - port: 5432
+      targetPort: 5432
+      protocol: TCP
+      name: postgresql
+  selector:
+    app: postgresql
+    role: primary
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql-replica
+  namespace: zarish-healthcare
+  labels:
+    app: postgresql
+    service: postgresql-replica
+    version: v1
+    environment: production
+    tier: database
+    role: replica
+spec:
+  ports:
+    - port: 5432
+      targetPort: 5432
+      protocol: TCP
+      name: postgresql
+  selector:
+    app: postgresql
+    role: replica
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: zarish-healthcare
+  labels:
+    app: redis
+    service: redis
+    version: v1
+    environment: production
+    tier: cache
+spec:
+  ports:
+    - port: 6379
+      targetPort: 6379
+      protocol: TCP
+      name: redis
+  selector:
+    app: redis
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: couchdb
+  namespace: zarish-healthcare
+  labels:
+    app: couchdb
+    service: couchdb
+    version: v1
+    environment: production
+    tier: database
+    purpose: offline-sync
+spec:
+  ports:
+    - port: 5984
+      targetPort: 5984
+      protocol: TCP
+      name: http
+  selector:
+    app: couchdb
+  type: ClusterIP
+
+---
+# Service Accounts for RBAC
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: zarish-care
+  namespace: zarish-healthcare
+  labels:
+    app: zarish-care
+    service: zarish-care
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: zarish-labs
+  namespace: zarish-healthcare
+  labels:
+    app: zarish-labs
+    service: zarish-labs
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: zarish-ops
+  namespace: zarish-healthcare
+  labels:
+    app: zarish-ops
+    service: zarish-ops
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: zarish-analytics
+  namespace: zarish-healthcare
+  labels:
+    app: zarish-analytics
+    service: zarish-analytics
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: zarish-access
+  namespace: zarish-healthcare
+  labels:
+    app: zarish-access
+    service: zarish-access
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: zarish-sync
+  namespace: zarish-healthcare
+  labels:
+    app: zarish-sync
+    service: zarish-sync
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: clinical-staff
+  namespace: zarish-healthcare
+  labels:
+    role: clinical-staff
+    type: user-role
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: lab-technician
+  namespace: zarish-healthcare
+  labels:
+    role: lab-technician
+    type: user-role
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: operations-coordinator
+  namespace: zarish-healthcare
+  labels:
+    role: operations-coordinator
+    type: user-role
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: program-manager
+  namespace: zarish-healthcare
+  labels:
+    role: program-manager
+    type: user-role
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: data-analyst
+  namespace: zarish-healthcare
+  labels:
+    role: data-analyst
+    type: user-role
+
+---
+# Network Policies for Additional Security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: zarish-healthcare-network-policy
+  namespace: zarish-healthcare
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  
+  ingress:
+    # Allow traffic from Istio ingress gateway
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: istio-system
+      ports:
+        - protocol: TCP
+          port: 3001
+        - protocol: TCP
+          port: 3002
+        - protocol: TCP
+          port: 3003
+        - protocol: TCP
+          port: 3004
+        - protocol: TCP
+          port: 3005
+        - protocol: TCP
+          port: 3006
+        - protocol: TCP
+          port: 3000
+        - protocol: TCP
+          port: 3007
+        - protocol: TCP
+          port: 8080
+
+    # Allow inter-service communication within namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: zarish-healthcare
+      ports:
+        - protocol: TCP
+          port: 3001
+        - protocol: TCP
+          port: 3002
+        - protocol: TCP
+          port: 3003
+        - protocol: TCP
+          port: 3004
+        - protocol: TCP
+          port: 3005
+        - protocol: TCP
+          port: 3006
+
+    # Allow database access
+    - from:
+        - podSelector:
+            matchLabels:
+              tier: backend
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 6379
+        - protocol: TCP
+          port: 5984
+
+    # Allow metrics collection
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: zarish-monitoring
+      ports:
+        - protocol: TCP
+          port: 9090
+
+  egress:
+    # Allow DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+
+    # Allow database access
+    - to:
+        - podSelector:
+            matchLabels:
+              tier: database
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 5984
+
+    # Allow cache access
+    - to:
+        - podSelector:
+            matchLabels:
+              tier: cache
+      ports:
+        - protocol: TCP
+          port: 6379
+
+    # Allow external API access (WHO, DHIS2, etc.)
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 443
+
+    # Allow inter-service communication
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: zarish-healthcare
+      ports:
+        - protocol: TCP
+          port: 3001
+        - protocol: TCP
+          port: 3002
+        - protocol: TCP
+          port: 3003
+        - protocol: TCP
+          port: 3004
+        - protocol: TCP
+          port: 3005
+        - protocol: TCP
+          port: 3006
+
+    # Allow metrics export
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: zarish-monitoring
+      ports:
+        - protocol: TCP
+          port: 9090
+        - protocol: TCP
+          port: 9091

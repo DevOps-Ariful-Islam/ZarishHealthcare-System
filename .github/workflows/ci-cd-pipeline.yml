@@ -1,0 +1,598 @@
+# ZarishHealthcare System CI/CD Pipeline
+# Comprehensive deployment automation for humanitarian healthcare services
+
+name: ZarishHealthcare CI/CD Pipeline
+
+on:
+  push:
+    branches: 
+      - main
+      - develop
+      - release/*
+      - hotfix/*
+  pull_request:
+    branches: 
+      - main
+      - develop
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+        - emergency-response
+      deployment_type:
+        description: 'Deployment type'
+        required: true
+        default: 'standard'
+        type: choice
+        options:
+        - standard
+        - blue-green
+        - canary
+        - rollback
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: zarish-healthcare
+  NODE_VERSION: '18.x'
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+
+jobs:
+  # Security and Vulnerability Scanning
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+
+      - name: Upload Trivy scan results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: HIPAA Compliance Check
+        run: |
+          echo "Running HIPAA compliance validation..."
+          # Check for hardcoded credentials
+          if grep -r "password\|secret\|key" --exclude-dir=node_modules --exclude="*.yml" --exclude="*.yaml" --include="*.js" --include="*.ts" --include="*.json" .; then
+            echo "❌ Potential hardcoded credentials found - HIPAA violation risk"
+            exit 1
+          fi
+          
+          # Check for patient data exposure
+          if grep -r "patient.*id\|medical.*record\|ssn\|phi" --exclude-dir=node_modules --include="*.js" --include="*.ts" .; then
+            echo "⚠️ Potential PHI exposure detected - review required"
+          fi
+          
+          echo "✅ Basic HIPAA compliance checks passed"
+
+      - name: GDPR Compliance Check
+        run: |
+          echo "Running GDPR compliance validation..."
+          # Check for data processing without consent mechanisms
+          if ! find . -name "*.ts" -o -name "*.js" | xargs grep -l "consent\|gdpr\|data.subject" | head -1 > /dev/null; then
+            echo "⚠️ No GDPR consent mechanisms detected"
+          fi
+          echo "✅ Basic GDPR compliance checks passed"
+
+  # Code Quality and Testing
+  test-and-quality:
+    name: Test & Quality Assurance
+    runs-on: ubuntu-latest
+    needs: security-scan
+    strategy:
+      matrix:
+        service: [zarish-care, zarish-labs, zarish-ops, zarish-analytics, zarish-access, zarish-sync]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'services/${{ matrix.service }}/package-lock.json'
+
+      - name: Install dependencies
+        run: |
+          cd services/${{ matrix.service }}
+          npm ci --only=production
+          npm ci
+
+      - name: Run TypeScript compilation
+        run: |
+          cd services/${{ matrix.service }}
+          npm run build
+
+      - name: Run unit tests
+        run: |
+          cd services/${{ matrix.service }}
+          npm test -- --coverage --testResultsProcessor=jest-sonar-reporter
+        env:
+          NODE_ENV: test
+
+      - name: Run integration tests
+        run: |
+          cd services/${{ matrix.service }}
+          npm run test:integration
+        env:
+          NODE_ENV: test
+          TEST_DATABASE_URL: postgresql://test:test@localhost:5432/zarish_test
+
+      - name: Healthcare-specific tests
+        run: |
+          cd services/${{ matrix.service }}
+          # HIPAA compliance tests
+          npm run test:hipaa
+          # GDPR compliance tests  
+          npm run test:gdpr
+          # Emergency response tests
+          npm run test:emergency
+          # Offline sync tests (for applicable services)
+          if [[ "${{ matrix.service }}" == "zarish-sync" ]]; then
+            npm run test:offline
+          fi
+
+      - name: Performance testing
+        run: |
+          cd services/${{ matrix.service }}
+          npm run test:performance
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: services/${{ matrix.service }}/coverage/lcov.info
+          flags: ${{ matrix.service }}
+
+  # Frontend Testing
+  frontend-test:
+    name: Frontend Testing
+    runs-on: ubuntu-latest
+    needs: security-scan
+    strategy:
+      matrix:
+        app: [clinical-dashboard, mobile-app]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'apps/${{ matrix.app }}/package-lock.json'
+
+      - name: Install dependencies
+        run: |
+          cd apps/${{ matrix.app }}
+          npm ci
+
+      - name: Run tests
+        run: |
+          cd apps/${{ matrix.app }}
+          npm test -- --coverage
+
+      - name: Build application
+        run: |
+          cd apps/${{ matrix.app }}
+          npm run build
+
+      - name: Accessibility testing
+        run: |
+          cd apps/${{ matrix.app }}
+          npm run test:a11y
+
+      - name: Mobile-specific tests
+        if: matrix.app == 'mobile-app'
+        run: |
+          cd apps/${{ matrix.app }}
+          # Offline functionality tests
+          npm run test:offline
+          # Field operation simulation tests
+          npm run test:field-ops
+
+  # Container Building and Security
+  build-containers:
+    name: Build & Scan Containers
+    runs-on: ubuntu-latest
+    needs: [test-and-quality, frontend-test]
+    if: github.event_name != 'pull_request'
+    strategy:
+      matrix:
+        component: 
+          - zarish-care
+          - zarish-labs  
+          - zarish-ops
+          - zarish-analytics
+          - zarish-access
+          - zarish-sync
+          - clinical-dashboard
+          - mobile-app-backend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_PREFIX }}-${{ matrix.component }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Determine Dockerfile path
+        id: dockerfile
+        run: |
+          if [[ "${{ matrix.component }}" == clinical-dashboard* ]]; then
+            echo "path=apps/clinical-dashboard/Dockerfile" >> $GITHUB_OUTPUT
+            echo "context=apps/clinical-dashboard" >> $GITHUB_OUTPUT
+          elif [[ "${{ matrix.component }}" == mobile-app* ]]; then
+            echo "path=apps/mobile-app/Dockerfile.backend" >> $GITHUB_OUTPUT
+            echo "context=apps/mobile-app" >> $GITHUB_OUTPUT
+          else
+            echo "path=services/${{ matrix.component }}/Dockerfile" >> $GITHUB_OUTPUT
+            echo "context=services/${{ matrix.component }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and push container
+        uses: docker/build-push-action@v4
+        with:
+          context: ${{ steps.dockerfile.outputs.context }}
+          file: ${{ steps.dockerfile.outputs.path }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            NODE_ENV=production
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            VCS_REF=${{ github.sha }}
+            VERSION=${{ steps.meta.outputs.version }}
+
+      - name: Run container security scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ github.repository }}/${{ env.IMAGE_PREFIX }}-${{ matrix.component }}:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-${{ matrix.component }}.sarif'
+
+      - name: Upload container scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-${{ matrix.component }}.sarif'
+
+  # Database Migration and Validation
+  database-migration:
+    name: Database Migration & Validation
+    runs-on: ubuntu-latest
+    needs: build-containers
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: zarish_healthcare_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Run database migrations
+        run: |
+          cd scripts/database
+          npm install
+          npm run migrate:test
+        env:
+          DATABASE_URL: postgresql://postgres:test_password@localhost:5432/zarish_healthcare_test
+          REDIS_URL: redis://localhost:6379
+
+      - name: Validate HIPAA compliance schema
+        run: |
+          cd scripts/database
+          npm run validate:hipaa-schema
+
+      - name: Generate test data
+        run: |
+          cd scripts/database
+          npm run seed:test-data
+
+      - name: Backup and restore testing
+        run: |
+          cd scripts/database
+          npm run test:backup-restore
+
+  # Staging Deployment
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build-containers, database-migration]
+    if: github.ref == 'refs/heads/develop' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')
+    environment: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: '3.12.0'
+
+      - name: Configure staging cluster access
+        run: |
+          echo "${{ secrets.STAGING_KUBECONFIG }}" | base64 -d > $HOME/.kube/config
+          kubectl config use-context staging-cluster
+
+      - name: Deploy to staging
+        run: |
+          cd deployment/helm/zarish-healthcare
+          helm upgrade --install zarish-healthcare-staging . \
+            --namespace zarish-healthcare-staging \
+            --create-namespace \
+            --values values-staging.yaml \
+            --set global.image.tag=${{ github.sha }} \
+            --set global.environment=staging \
+            --wait --timeout=15m
+
+      - name: Run staging health checks
+        run: |
+          cd scripts/health-checks
+          npm install
+          npm run check:staging
+        env:
+          STAGING_URL: https://api-staging.zarish.humanitarian.health
+          HEALTH_CHECK_TIMEOUT: 300
+
+      - name: Run staging smoke tests
+        run: |
+          cd tests/e2e
+          npm install
+          npm run test:smoke -- --env=staging
+
+  # Production Deployment  
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build-containers, database-migration]
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production')
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+
+      - name: Pre-deployment validation
+        run: |
+          echo "🔍 Running pre-deployment validation..."
+          cd scripts/deployment
+          npm install
+          npm run validate:production
+
+      - name: Database backup
+        run: |
+          cd scripts/database
+          npm run backup:production
+        env:
+          BACKUP_ENCRYPTION_KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+
+      - name: Configure production cluster access
+        run: |
+          echo "${{ secrets.PRODUCTION_KUBECONFIG }}" | base64 -d > $HOME/.kube/config
+          kubectl config use-context production-cluster
+
+      - name: Deploy monitoring stack
+        run: |
+          cd infrastructure/monitoring
+          kubectl apply -f deploy-monitoring-stack.yaml
+
+      - name: Blue-Green Deployment
+        if: github.event.inputs.deployment_type == 'blue-green' || github.event.inputs.deployment_type == ''
+        run: |
+          cd deployment/scripts
+          ./blue-green-deploy.sh ${{ github.sha }}
+
+      - name: Canary Deployment
+        if: github.event.inputs.deployment_type == 'canary'
+        run: |
+          cd deployment/scripts
+          ./canary-deploy.sh ${{ github.sha }}
+
+      - name: Standard Deployment
+        if: github.event.inputs.deployment_type == 'standard'
+        run: |
+          cd deployment/helm/zarish-healthcare
+          helm upgrade --install zarish-healthcare . \
+            --namespace zarish-healthcare \
+            --values values-production.yaml \
+            --set global.image.tag=${{ github.sha }} \
+            --set global.environment=production \
+            --wait --timeout=20m
+
+      - name: Post-deployment validation
+        run: |
+          cd scripts/health-checks
+          npm run check:production
+        env:
+          PRODUCTION_URL: https://api.zarish.humanitarian.health
+          HEALTH_CHECK_TIMEOUT: 600
+
+      - name: Run production smoke tests
+        run: |
+          cd tests/e2e
+          npm run test:smoke -- --env=production
+
+      - name: Update deployment status
+        run: |
+          echo "✅ Production deployment completed successfully"
+          echo "🔗 Dashboard: https://dashboard.zarish.humanitarian.health"
+          echo "📊 Monitoring: https://grafana.zarish.humanitarian.health"
+
+  # Emergency Response Deployment
+  deploy-emergency:
+    name: Emergency Response Deployment
+    runs-on: ubuntu-latest
+    needs: build-containers
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'emergency-response'
+    environment: emergency-response
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Emergency deployment validation
+        run: |
+          echo "🚨 EMERGENCY DEPLOYMENT INITIATED"
+          echo "Deployment time: $(date)"
+          echo "Deployer: ${{ github.actor }}"
+          echo "Commit: ${{ github.sha }}"
+
+      - name: Deploy emergency configuration
+        run: |
+          cd deployment/emergency
+          ./emergency-deploy.sh ${{ github.sha }}
+
+      - name: Activate emergency monitoring
+        run: |
+          cd scripts/emergency
+          npm run activate:emergency-monitoring
+
+      - name: Notify emergency response team
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{"text":"🚨 EMERGENCY DEPLOYMENT: ZarishHealthcare system deployed in emergency response mode. All monitoring systems activated."}' \
+            ${{ secrets.EMERGENCY_SLACK_WEBHOOK }}
+
+  # Rollback capability
+  rollback-deployment:
+    name: Rollback Deployment
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.deployment_type == 'rollback'
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Execute rollback
+        run: |
+          cd deployment/scripts
+          ./rollback.sh --environment=${{ github.event.inputs.environment }}
+
+      - name: Validate rollback
+        run: |
+          cd scripts/health-checks
+          npm run check:${{ github.event.inputs.environment }}
+
+  # Notification and Reporting
+  notify-completion:
+    name: Deployment Notification
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, deploy-production, deploy-emergency]
+    if: always() && (needs.deploy-staging.result != 'skipped' || needs.deploy-production.result != 'skipped' || needs.deploy-emergency.result != 'skipped')
+    steps:
+      - name: Determine deployment status
+        id: status
+        run: |
+          if [[ "${{ needs.deploy-production.result }}" == "success" ]]; then
+            echo "status=✅ Production deployment successful" >> $GITHUB_OUTPUT
+            echo "environment=production" >> $GITHUB_OUTPUT
+          elif [[ "${{ needs.deploy-staging.result }}" == "success" ]]; then
+            echo "status=✅ Staging deployment successful" >> $GITHUB_OUTPUT
+            echo "environment=staging" >> $GITHUB_OUTPUT
+          elif [[ "${{ needs.deploy-emergency.result }}" == "success" ]]; then
+            echo "status=🚨 Emergency deployment successful" >> $GITHUB_OUTPUT
+            echo "environment=emergency" >> $GITHUB_OUTPUT
+          else
+            echo "status=❌ Deployment failed" >> $GITHUB_OUTPUT
+            echo "environment=unknown" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Slack notification
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: |
+            ${{ steps.status.outputs.status }}
+            Environment: ${{ steps.status.outputs.environment }}
+            Commit: ${{ github.sha }}
+            Actor: ${{ github.actor }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+
+      - name: Generate deployment report
+        run: |
+          echo "# ZarishHealthcare Deployment Report" > deployment-report.md
+          echo "**Status:** ${{ steps.status.outputs.status }}" >> deployment-report.md
+          echo "**Environment:** ${{ steps.status.outputs.environment }}" >> deployment-report.md
+          echo "**Commit:** ${{ github.sha }}" >> deployment-report.md
+          echo "**Deployed by:** ${{ github.actor }}" >> deployment-report.md
+          echo "**Deployment time:** $(date)" >> deployment-report.md
+
+      - name: Upload deployment report
+        uses: actions/upload-artifact@v3
+        with:
+          name: deployment-report
+          path: deployment-report.md

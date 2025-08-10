@@ -1,0 +1,697 @@
+# ZarishHealthcare System Default Values
+# Humanitarian healthcare microservices configuration
+
+# Global configuration
+global:
+  imageRegistry: "ghcr.io"
+  imagePrefix: "zarish-healthcare"
+  imagePullSecrets:
+    - name: zarish-registry-secret
+  storageClass: "fast-ssd"
+  environment: "development"
+  region: "multi-region"
+  compliance:
+    hipaa: true
+    gdpr: true
+    whoStandards: true
+  
+  # Emergency response configuration
+  emergencyMode:
+    enabled: false
+    alertingThreshold: "critical"
+    backupInterval: "5m"
+    syncPriority: "emergency"
+  
+  # Security configuration
+  security:
+    tls:
+      enabled: true
+      certManager: true
+    rbac:
+      enabled: true
+    networkPolicies:
+      enabled: true
+    podSecurityPolicy:
+      enabled: true
+
+# ZarishCare - Clinical Management Service
+zarishCare:
+  enabled: true
+  name: zarish-care
+  replicaCount: 3
+  image:
+    repository: zarish-care
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 3001
+    targetPort: 3001
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "9090"
+  
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+  
+  env:
+    NODE_ENV: "production"
+    PORT: "3001"
+    METRICS_PORT: "9090"
+    LOG_LEVEL: "info"
+    HIPAA_COMPLIANCE: "true"
+    GDPR_COMPLIANCE: "true"
+  
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 3001
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: 3001
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+# ZarishLabs - Laboratory Management Service
+zarishLabs:
+  enabled: true
+  name: zarish-labs
+  replicaCount: 2
+  image:
+    repository: zarish-labs
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 3002
+    targetPort: 3002
+  
+  resources:
+    requests:
+      cpu: 300m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  
+  env:
+    NODE_ENV: "production"
+    PORT: "3002"
+    LAB_INTEGRATION_MODE: "multi-vendor"
+    QUALITY_CONTROL: "enabled"
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 75
+
+# ZarishOps - Operations Coordination Service
+zarishOps:
+  enabled: true
+  name: zarish-ops
+  replicaCount: 2
+  image:
+    repository: zarish-ops
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 3003
+    targetPort: 3003
+  
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 800m
+      memory: 1Gi
+  
+  env:
+    NODE_ENV: "production"
+    PORT: "3003"
+    COORDINATION_MODE: "multi-partner"
+    EMERGENCY_PROTOCOLS: "enabled"
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 80
+
+# ZarishAnalytix - Analytics and Reporting Service
+zarishAnalytics:
+  enabled: true
+  name: zarish-analytics
+  replicaCount: 2
+  image:
+    repository: zarish-analytics
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 3004
+    targetPort: 3004
+  
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+    limits:
+      cpu: 4000m
+      memory: 8Gi
+  
+  env:
+    NODE_ENV: "production"
+    PORT: "3004"
+    ANALYTICS_MODE: "real-time"
+    AI_ENABLED: "true"
+    POPULATION_HEALTH: "enabled"
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage: 70
+
+# ZarishAccess - Identity and Access Management Service
+zarishAccess:
+  enabled: true
+  name: zarish-access
+  replicaCount: 3
+  image:
+    repository: zarish-access
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 3005
+    targetPort: 3005
+  
+  resources:
+    requests:
+      cpu: 300m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  
+  env:
+    NODE_ENV: "production"
+    PORT: "3005"
+    JWT_EXPIRATION: "8h"
+    MFA_REQUIRED: "true"
+    SESSION_TIMEOUT: "30m"
+    AUDIT_LOGGING: "comprehensive"
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 65
+
+# ZarishSync - Offline Synchronization Service
+zarishSync:
+  enabled: true
+  name: zarish-sync
+  replicaCount: 2
+  image:
+    repository: zarish-sync
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 3006
+    targetPort: 3006
+  
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+  
+  env:
+    NODE_ENV: "production"
+    PORT: "3006"
+    SYNC_STRATEGY: "intelligent"
+    CONFLICT_RESOLUTION: "automatic"
+    OFFLINE_RETENTION: "72h"
+    BANDWIDTH_OPTIMIZATION: "enabled"
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+
+# Frontend Applications
+clinicalDashboard:
+  enabled: true
+  name: clinical-dashboard
+  replicaCount: 2
+  image:
+    repository: clinical-dashboard
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 3000
+    targetPort: 3000
+  
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    hosts:
+      - host: dashboard.zarish.humanitarian.health
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: dashboard-tls
+        hosts:
+          - dashboard.zarish.humanitarian.health
+
+mobileAppBackend:
+  enabled: true
+  name: mobile-app-backend
+  replicaCount: 2
+  image:
+    repository: mobile-app-backend
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 3007
+    targetPort: 3007
+  
+  resources:
+    requests:
+      cpu: 300m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+# Database Configuration
+postgresql:
+  enabled: true
+  auth:
+    enablePostgresUser: true
+    postgresPassword: "change-in-production"
+    username: "zarish_user"
+    password: "change-in-production"
+    database: "zarish_healthcare"
+  
+  architecture: replication
+  primary:
+    persistence:
+      enabled: true
+      size: 100Gi
+      storageClass: "fast-ssd"
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+      limits:
+        cpu: 4000m
+        memory: 8Gi
+  
+  readReplicas:
+    replicaCount: 2
+    persistence:
+      enabled: true
+      size: 100Gi
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+  
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# Cache Configuration
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    password: "change-in-production"
+  
+  architecture: replication
+  master:
+    persistence:
+      enabled: true
+      size: 10Gi
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+  
+  replica:
+    replicaCount: 2
+    persistence:
+      enabled: true
+      size: 10Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 300m
+        memory: 512Mi
+  
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# CouchDB for Offline Sync
+couchdb:
+  enabled: true
+  clusterSize: 3
+  couchdbConfig:
+    couchdb:
+      uuid: "humanitarian-healthcare-cluster"
+    chttpd:
+      port: 5984
+      bind_address: "0.0.0.0"
+  
+  persistentVolume:
+    enabled: true
+    size: 50Gi
+    storageClass: "fast-ssd"
+  
+  resources:
+    requests:
+      cpu: 300m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+# API Gateway (Kong)
+kong:
+  enabled: true
+  image:
+    repository: kong
+    tag: "3.3.1"
+  
+  admin:
+    enabled: true
+    type: ClusterIP
+  
+  proxy:
+    enabled: true
+    type: LoadBalancer
+  
+  env:
+    database: postgres
+    pg_host: zarish-healthcare-postgresql
+    pg_database: kong
+    pg_user: kong
+    pg_password: "change-in-production"
+  
+  resources:
+    requests:
+      cpu: 300m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+# Service Mesh (Istio)
+istio:
+  enabled: true
+  injection: enabled
+  
+  gateway:
+    enabled: true
+    hosts:
+      - "*.zarish.humanitarian.health"
+      - "api.zarish.humanitarian.health"
+      - "dashboard.zarish.humanitarian.health"
+  
+  virtualService:
+    enabled: true
+    routes:
+      - match:
+          - uri:
+              prefix: "/api/v1/patients"
+        route:
+          - destination:
+              host: zarish-care
+              port:
+                number: 3001
+
+# Monitoring Stack
+monitoring:
+  enabled: true
+  
+  prometheus:
+    enabled: true
+    retention: "15d"
+    storageSize: "100Gi"
+    resources:
+      requests:
+        cpu: 500m
+        memory: 2Gi
+      limits:
+        cpu: 2000m
+        memory: 8Gi
+  
+  grafana:
+    enabled: true
+    adminPassword: "change-in-production"
+    persistence:
+      enabled: true
+      size: "20Gi"
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+  
+  jaeger:
+    enabled: true
+    storage:
+      type: elasticsearch
+    resources:
+      collector:
+        requests:
+          cpu: 200m
+          memory: 512Mi
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+      query:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+
+# Logging Stack
+logging:
+  enabled: true
+  
+  elasticsearch:
+    enabled: true
+    replicas: 3
+    minimumMasterNodes: 2
+    persistence:
+      enabled: true
+      size: "100Gi"
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+  
+  fluentBit:
+    enabled: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+# Security Configuration
+security:
+  networkPolicies:
+    enabled: true
+    
+  podSecurityPolicy:
+    enabled: true
+    
+  serviceAccount:
+    create: true
+    name: "zarish-healthcare-sa"
+    
+  rbac:
+    create: true
+    
+  certificates:
+    enabled: true
+    issuer: "letsencrypt-prod"
+    
+  vault:
+    enabled: false
+    address: ""
+    path: "zarish-healthcare"
+
+# Backup Configuration
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention: "30d"
+  encryption:
+    enabled: true
+    key: "change-in-production"
+  
+  destinations:
+    - type: s3
+      bucket: "zarish-healthcare-backups"
+      region: "us-east-1"
+    - type: azure
+      container: "zarish-backups"
+      account: "zarishstorage"
+
+# Emergency Response Configuration
+emergencyResponse:
+  enabled: false
+  
+  alerts:
+    webhook: ""
+    email:
+      - "emergency@zarish.org"
+      - "ops@zarish.org"
+  
+  scaling:
+    autoScale: true
+    emergencyReplicas: 5
+    
+  monitoring:
+    enhancedMetrics: true
+    criticalAlerts: true
+
+# Compliance Configuration
+compliance:
+  hipaa:
+    enabled: true
+    auditLogging: comprehensive
+    encryption: required
+    accessControls: strict
+    dataRetention: "2555d"  # 7 years
+    
+  gdpr:
+    enabled: true
+    dataSubjectRights: enabled
+    consentManagement: required
+    dataPortability: enabled
+    rightToErasure: enabled
+    
+  whoStandards:
+    enabled: true
+    dataQuality: enforced
+    interoperability: hl7-fhir
+    reportingStandards: who-dhis2
+
+# Development and Testing
+development:
+  enabled: false
+  
+  seedData:
+    enabled: false
+    patients: 1000
+    facilities: 10
+    providers: 100
+    
+  testUsers:
+    enabled: false
+    adminUser: "admin@zarish.local"
+    clinicianUser: "doctor@zarish.local"
+    nurseUser: "nurse@zarish.local"
+
+# Resource Quotas
+resourceQuotas:
+  enabled: true
+  requests:
+    cpu: "10"
+    memory: "20Gi"
+  limits:
+    cpu: "50"
+    memory: "100Gi"
+  persistentVolumeClaims: "20"
+  services: "20"
+  secrets: "50"
+  configMaps: "50"
+
+# Node Affinity and Tolerations
+nodeAffinity:
+  enabled: false
+  nodeSelector: {}
+  
+tolerations: []
+
+# Pod Disruption Budgets
+podDisruptionBudgets:
+  enabled: true
+  minAvailable: 1
