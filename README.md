@@ -32,7 +32,7 @@ ZarishHealthcare is a comprehensive, microservices-based healthcare information 
 
 ```bash
 # Clone the repository
-git clone https://github.com/zarishsphere/zarishhealthcare-system
+git clone https://github.com/DevOps-Ariful-Islam/ZarishHealthCare-System
 cd zarishhealthcare-system
 
 # Start development environment
@@ -160,4 +160,5 @@ Copyright © 2025 ZarishSphere. All rights reserved.
 
 - Documentation: https://docs.zarishhealthcare.org
 - Community: https://community.zarishhealthcare.org
-- Issues: https://github.com/zarishsphere/zarishhealthcare-system/issues
+- Issues: https://github.com/DevOps-Ariful-Islam/ZarisHhealthcare-System/issues
+# ZarishHealthcare-System
