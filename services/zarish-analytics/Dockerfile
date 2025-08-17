@@ -11,21 +11,21 @@ WORKDIR /app
 RUN apk add --no-cache python3 make g++ py3-pip
 
 # Install Python dependencies for ML support
-RUN pip3 install numpy pandas scikit-learn tensorflow-lite
+RUN pip3 install --no-cache-dir numpy pandas scikit-learn tensorflow-lite --break-system-packages
 
 # Copy package files
 COPY ./services/zarish-analytics/package*.json ./
 COPY ./packages/shared-types ./packages/shared-types
 
 # Install dependencies
-RUN npm ci --only=production
+RUN yarn install --frozen-lockfile
 
 # Copy source code
 COPY ./services/zarish-analytics/src ./src
 COPY ./services/zarish-analytics/tsconfig.json ./
 
 # Build TypeScript code
-RUN npm run build
+RUN yarn build
 
 # Stage 2: Production stage
 FROM node:18-alpine AS production
@@ -46,7 +46,7 @@ RUN apk add --no-cache \
     && rm -rf /var/cache/apk/*
 
 # Install Python runtime dependencies
-RUN pip3 install --no-cache-dir numpy pandas scikit-learn tensorflow-lite
+RUN pip3 install --no-cache-dir numpy pandas scikit-learn tensorflow-lite --break-system-packages
 
 # Copy built application from builder stage
 COPY --from=builder --chown=zarish:zarish /app/dist ./dist

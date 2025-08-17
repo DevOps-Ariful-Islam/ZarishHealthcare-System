@@ -13,7 +13,7 @@ COPY ./services/zarish-care/package*.json ./
 COPY ./services/zarish-care/tsconfig.json ./
 
 # Install dependencies
-RUN npm ci --only=production && npm cache clean --force
+RUN yarn install --frozen-lockfile && npm cache clean --force
 
 # Development stage
 FROM base AS development
@@ -30,7 +30,7 @@ RUN npm ci
 COPY ./services/zarish-care/src ./src
 COPY ./services/zarish-care/tsconfig.json ./tsconfig.json
 COPY ./packages/shared-types ./packages/shared-types
-RUN npm run build
+RUN yarn build
 
 # Production stage
 FROM node:20-alpine AS production

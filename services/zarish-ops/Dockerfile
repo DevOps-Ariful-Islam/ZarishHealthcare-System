@@ -15,14 +15,14 @@ COPY ./services/zarish-ops/package*.json ./
 COPY ./packages/shared-types ./packages/shared-types
 
 # Install dependencies
-RUN npm ci --only=production
+RUN yarn install --frozen-lockfile
 
 # Copy source code
 COPY ./services/zarish-ops/src ./src
 COPY ./services/zarish-ops/tsconfig.json ./
 
 # Build TypeScript code
-RUN npm run build
+RUN yarn build
 
 # Stage 2: Production stage
 FROM node:18-alpine AS production
