@@ -1,0 +1,19 @@
+# See https://github.com/github/gitignore for templates
+node_modules/
+dist/
+build/
+.env
+.DS_Store
+*.log
+coverage/
+.idea/
+.vscode/
+*.sqlite
+*.db
+*.bak
+*.tmp
+.yarn/
+.yarnrc.yml
+apps/*/node_modules/
+services/*/node_modules/
+packages/*/node_modules/

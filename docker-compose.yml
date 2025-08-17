@@ -1,12 +1,15 @@
 services:
+  # Load environment variables from .env file
+  env_file:
+    - .env
   # Infrastructure Services
   postgres:
     image: postgres:15-alpine
     container_name: zarish-postgres
-    environment:
-      POSTGRES_DB: zarishhealthcare
-      POSTGRES_USER: zarish
-      POSTGRES_PASSWORD: zarish123
+      environment:
+        POSTGRES_DB: ${POSTGRES_DB}
+        POSTGRES_USER: ${POSTGRES_USER}
+        POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
@@ -26,9 +29,9 @@ services:
   couchdb:
     image: couchdb:3.3
     container_name: zarish-couchdb
-    environment:
-      COUCHDB_USER: zarish
-      COUCHDB_PASSWORD: zarish123
+      environment:
+        COUCHDB_USER: ${COUCHDB_USER}
+        COUCHDB_PASSWORD: ${COUCHDB_PASSWORD}
     ports:
       - "5984:5984"
     volumes:
@@ -62,11 +65,11 @@ services:
       context: .
       dockerfile: ./services/zarish-access/Dockerfile
     container_name: zarish-access
-    environment:
-      DATABASE_URL: postgres://zarish:zarish123@postgres:5432/zarishhealthcare
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: zarish-jwt-secret-key
-      PORT: 8080
+      environment:
+        DATABASE_URL: ${DATABASE_URL}
+        REDIS_URL: ${REDIS_URL}
+        JWT_SECRET: ${JWT_SECRET}
+        PORT: 8080
     ports:
       - "3001:8080"
     depends_on:
@@ -81,12 +84,12 @@ services:
       context: .
       dockerfile: ./services/zarish-care/Dockerfile
     container_name: zarish-care
-    environment:
-      DATABASE_URL: postgres://zarish:zarish123@postgres:5432/zarishhealthcare
-      COUCHDB_URL: http://zarish:zarish123@couchdb:5984
-      REDIS_URL: redis://redis:6379
-      AUTH_SERVICE_URL: http://zarish-access:8080
-      PORT: 8080
+      environment:
+        DATABASE_URL: ${DATABASE_URL}
+        COUCHDB_URL: ${COUCHDB_URL}
+        REDIS_URL: ${REDIS_URL}
+        AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+        PORT: 8080
     ports:
       - "3002:8080"
     depends_on:
@@ -103,12 +106,12 @@ services:
       context: .
       dockerfile: ./services/zarish-labs/Dockerfile
     container_name: zarish-labs
-    environment:
-      DATABASE_URL: postgres://zarish:zarish123@postgres:5432/zarishhealthcare
-      REDIS_URL: redis://redis:6379
-      AUTH_SERVICE_URL: http://zarish-access:8080
-      CARE_SERVICE_URL: http://zarish-care:8080
-      PORT: 8080
+      environment:
+        DATABASE_URL: ${DATABASE_URL}
+        REDIS_URL: ${REDIS_URL}
+        AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+        CARE_SERVICE_URL: ${CARE_SERVICE_URL}
+        PORT: 8080
     ports:
       - "3003:8080"
     depends_on:
@@ -125,11 +128,11 @@ services:
       context: .
       dockerfile: ./services/zarish-ops/Dockerfile
     container_name: zarish-ops
-    environment:
-      DATABASE_URL: postgres://zarish:zarish123@postgres:5432/zarishhealthcare
-      REDIS_URL: redis://redis:6379
-      AUTH_SERVICE_URL: http://zarish-access:8080
-      PORT: 8080
+      environment:
+        DATABASE_URL: ${DATABASE_URL}
+        REDIS_URL: ${REDIS_URL}
+        AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+        PORT: 8080
     ports:
       - "3004:8080"
     depends_on:
@@ -145,11 +148,11 @@ services:
       context: .
       dockerfile: ./services/zarish-analytics/Dockerfile
     container_name: zarish-analytix
-    environment:
-      DATABASE_URL: postgres://zarish:zarish123@postgres:5432/zarishhealthcare
-      REDIS_URL: redis://redis:6379
-      AUTH_SERVICE_URL: http://zarish-access:8080
-      PORT: 8080
+      environment:
+        DATABASE_URL: ${DATABASE_URL}
+        REDIS_URL: ${REDIS_URL}
+        AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+        PORT: 8080
     ports:
       - "3005:8080"
     depends_on:
@@ -165,12 +168,12 @@ services:
       context: .
       dockerfile: ./services/zarish-sync/Dockerfile
     container_name: zarish-sync
-    environment:
-      DATABASE_URL: postgres://zarish:zarish123@postgres:5432/zarishhealthcare
-      COUCHDB_URL: http://zarish:zarish123@couchdb:5984
-      REDIS_URL: redis://redis:6379
-      AUTH_SERVICE_URL: http://zarish-access:8080
-      PORT: 8080
+      environment:
+        DATABASE_URL: ${DATABASE_URL}
+        COUCHDB_URL: ${COUCHDB_URL}
+        REDIS_URL: ${REDIS_URL}
+        AUTH_SERVICE_URL: ${AUTH_SERVICE_URL}
+        PORT: 8080
     ports:
       - "3006:8080"
     depends_on:

@@ -1,3 +1,79 @@
+# ZarishHealthcare System
+
+## Overview
+ZarishHealthcare System is a comprehensive, microservices-based healthcare information platform designed for humanitarian operations. It supports offline-first workflows, multi-organization coordination, and regulatory compliance (HIPAA, GDPR).
+
+## Features
+- Humanitarian-specific healthcare workflows (NCD, MHPSS, maternal health, emergency response)
+- Offline-first operations for low-connectivity environments
+- Real-time analytics and reporting
+- Modular microservices architecture
+- Containerized deployment (Docker, Kubernetes, Helm)
+- API Gateway (Kong) and Service Mesh (Istio)
+- Security and compliance framework
+
+## Technology Stack
+- Node.js, TypeScript, Express.js
+- React (clinical dashboard, mobile app)
+- PostgreSQL, Redis, CouchDB
+- Kong API Gateway, Istio Service Mesh
+- GitHub Actions CI/CD
+
+## Getting Started
+
+### Prerequisites
+- Node.js >= 18.x
+- Yarn >= 4.x
+- Docker & Docker Compose
+- Kubernetes (optional, for production)
+
+### Setup
+1. Clone the repository:
+	```bash
+	git clone https://github.com/DevOps-Ariful-Islam/ZarishHealthcare-System.git
+	cd ZarishHealthcare-System
+	```
+2. Install dependencies:
+	```bash
+	yarn install
+	```
+3. Copy and edit the `.env` file as needed:
+	```bash
+	cp .env.example .env
+	# Edit .env with your secrets and config
+	```
+4. Start services (development):
+	```bash
+	yarn dev
+	```
+5. Build and run containers:
+	```bash
+	yarn docker:build
+	yarn docker:up
+	```
+
+### Testing & Quality
+- Run linting: `yarn lint`
+- Run formatting: `yarn format`
+- Run tests: `yarn test`
+
+## CI/CD
+Automated workflows for security scanning, testing, building, and deployment are configured in `.github/workflows/ci-cd-pipeline.yml`.
+
+## Contribution Guidelines
+1. Fork the repository and create your branch from `main`.
+2. Follow code style and commit conventions.
+3. Ensure all tests pass before submitting a PR.
+4. Document any new features or changes.
+
+## License
+This project is licensed as PROPRIETARY. Contact the author for usage permissions.
+
+## Authors & Credits
+ZarishSphere & ZarishHealthcare Architecture Team
+
+---
+For more details, see the documentation files in the root directory.
 # ZarishHealthcare System - Comprehensive Healthcare Information Platform
 
 ![ZarishHealthcare Logo](docs/assets/zarish-logo.png)
