@@ -45,7 +45,7 @@
     "pouchdb-adapter-http": "^8.0.1",
     "pouchdb-adapter-idb": "^8.0.1",
     "pouchdb-replication": "^8.0.1",
-    "couchdb-nano": "^10.1.2",
+    "nano": "^10.1.2",
     "jsonpatch": "^3.0.1",
     "diff": "^5.1.0",
     "async-lock": "^1.4.0",
@@ -57,7 +57,7 @@
     "zlib": "^1.0.5",
     "lz-string": "^1.5.0",
     "semver": "^7.5.4",
-    "@zarish/shared-types": "workspace:*"
+    "@zarishhealthcare/shared-types": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.9.0",

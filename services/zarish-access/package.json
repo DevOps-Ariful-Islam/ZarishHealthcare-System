@@ -56,7 +56,7 @@
     "moment-timezone": "^0.5.43",
     "geoip-lite": "^1.4.8",
     "useragent": "^2.3.0",
-    "@zarish/shared-types": "workspace:*"
+    "@zarishhealthcare/shared-types": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.9.0",

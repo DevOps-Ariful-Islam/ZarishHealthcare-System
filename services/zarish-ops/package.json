@@ -44,7 +44,7 @@
     "moment-timezone": "^0.5.43",
     "geojson": "^0.5.0",
     "turf": "^3.0.14",
-    "@zarish/shared-types": "workspace:*"
+    "@zarishhealthcare/shared-types": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.9.0",

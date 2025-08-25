@@ -51,7 +51,7 @@
     "react-leaflet": "^4.2.1",
     "leaflet": "^1.9.4",
     "pouchdb": "^8.0.1",
-    "pouchdb-react-native": "^8.0.0",
+    
     "react-i18next": "^13.5.0",
     "i18next": "^23.7.6",
     "react-hot-toast": "^2.4.1",
@@ -63,10 +63,10 @@
     "jspdf": "^2.5.1",
     "xlsx": "^0.18.5",
     "qrcode.react": "^3.1.0",
-    "react-barcode-generator": "^1.1.3",
+    "react-barcode": "^1.4.6",
     "workbox-webpack-plugin": "^7.0.0",
     "workbox-window": "^7.0.0",
-    "@zarish/shared-types": "workspace:*"
+    "@zarishhealthcare/shared-types": "workspace:*"
   },
   "devDependencies": {
     "@types/lodash": "^4.14.200",

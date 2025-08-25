@@ -37,7 +37,7 @@
     "node-cron": "^3.0.2",
     "nodemailer": "^6.9.7",
     "ws": "^8.14.2",
-    "@zarish/shared-types": "workspace:*"
+    "@zarishhealthcare/shared-types": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.9.0",

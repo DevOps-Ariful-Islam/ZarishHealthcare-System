@@ -54,7 +54,7 @@
     "json2csv": "^6.1.0",
     "excel4node": "^1.8.2",
     "pdf-lib": "^1.17.1",
-    "@zarish/shared-types": "workspace:*"
+    "@zarishhealthcare/shared-types": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.9.0",

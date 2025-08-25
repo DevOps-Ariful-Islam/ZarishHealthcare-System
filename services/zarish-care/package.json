@@ -1,5 +1,5 @@
 {
-  "name": "@zarishhealthcare/zarish-care",
+  "name": "@zarish/care",
   "version": "1.0.0",
   "description": "ZarishCare - Clinical Management Service for Humanitarian Healthcare",
   "main": "dist/index.js",

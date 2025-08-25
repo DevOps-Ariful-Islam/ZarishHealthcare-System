@@ -20,7 +20,11 @@
   "workspaces": [
     "apps/*",
     "packages/*",
-    "services/*"
+        "services/zarish-access",
+    "services/zarish-care",
+    "services/zarish-labs",
+    "services/zarish-ops",
+    "services/zarish-sync"
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev:services\" \"npm run dev:portal\" \"npm run dev:mobile\"",

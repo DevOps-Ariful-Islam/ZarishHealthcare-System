@@ -47,13 +47,13 @@
     "react-native-image-picker": "^7.0.3",
     "react-native-document-picker": "^9.1.1",
     "react-native-pdf": "^6.7.3",
-    "react-native-print": "^0.12.0",
+    
     "react-native-share": "^10.0.2",
     "react-native-qrcode-scanner": "^1.5.5",
     "react-native-barcode-builder": "^2.0.0",
     "react-native-device-info": "^10.11.0",
     "react-native-network-info": "^5.2.1",
-    "react-native-netinfo": "^11.2.1",
+    "@react-native-community/netinfo": "^11.2.1",
     "@react-native-async-storage/async-storage": "^1.21.0",
     "@react-native-community/netinfo": "^11.2.1",
     "react-native-keychain": "^8.1.3",
@@ -61,11 +61,12 @@
     "react-native-push-notification": "^8.1.1",
     "@react-native-firebase/app": "^18.6.1",
     "@react-native-firebase/messaging": "^18.6.1",
-    "react-native-background-sync": "^2.0.6",
+    
     "react-native-sqlite-storage": "^6.0.1",
     "react-native-fs": "^2.20.0",
-    "pouchdb-react-native": "^8.0.0",
-    "pouchdb-adapter-asyncstorage": "^8.0.0",
+    "pouchdb-core": "^8.0.0",
+    
+    
     "react-native-permissions": "^4.1.0",
     "react-native-localize": "^3.0.3",
     "i18next": "^23.7.6",
@@ -83,7 +84,7 @@
     "react-native-linear-gradient": "^2.8.3",
     "react-native-animatable": "^1.3.3",
     "lottie-react-native": "^6.4.1",
-    "@zarish/shared-types": "workspace:*"
+    "@zarishhealthcare/shared-types": "workspace:*"
   },
   "devDependencies": {
     "@babel/core": "^7.23.3",
@@ -105,11 +106,9 @@
     "@testing-library/react-native": "^12.4.2",
     "@testing-library/jest-native": "^5.4.3",
     "detox": "^20.13.5",
-    "flipper-plugin-react-query-native-devtools": "^5.0.0"
+    "react-query-native-devtools": "^5.0.0"
   },
-  "resolutions": {
-    "@types/react": "^18.2.39"
-  },
+  
   "jest": {
     "preset": "react-native",
     "moduleFileExtensions": [
